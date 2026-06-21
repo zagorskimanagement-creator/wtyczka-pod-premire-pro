@@ -1,0 +1,30 @@
+{
+  "name": "@shortforge/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.8.1",
+    "@sentry/node": "^7.99.0",
+    "@shortforge/ai-engine": "*",
+    "@shortforge/shared": "*",
+    "@shortforge/video-engine": "*",
+    "bullmq": "^5.1.6",
+    "ioredis": "^5.3.2",
+    "prisma": "^5.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  }
+}
