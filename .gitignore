@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.next/
+coverage/
+*.log
+.DS_Store
+.env
+.env.local
+.env.production
+.turbo/
+*.tsbuildinfo
+tmp/
+uploads/
+.cache/
+prisma/migrations/*/migration.sql
