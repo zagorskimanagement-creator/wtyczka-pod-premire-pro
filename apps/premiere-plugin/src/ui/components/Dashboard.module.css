@@ -1,0 +1,222 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.welcome h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sf-text-primary);
+  margin-bottom: 4px;
+}
+
+.welcome p {
+  font-size: 12px;
+  color: var(--sf-text-secondary);
+}
+
+.uploadZone {
+  border: 2px dashed var(--sf-border);
+  border-radius: var(--sf-radius-lg);
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--sf-transition);
+  background: var(--sf-bg-secondary);
+}
+
+.uploadZone:hover, .uploadZone.dragging {
+  border-color: var(--sf-accent);
+  background: var(--sf-accent-light);
+}
+
+.uploadZone.uploading {
+  cursor: default;
+  border-color: var(--sf-border);
+}
+
+.hiddenInput { display: none; }
+
+.uploadContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--sf-text-muted);
+}
+
+.uploadText {
+  font-size: 13px;
+  color: var(--sf-text-secondary);
+  font-weight: 500;
+}
+
+.uploadHint {
+  font-size: 11px;
+  color: var(--sf-text-muted);
+}
+
+.uploadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--sf-text-secondary);
+  font-size: 13px;
+}
+
+.uploadSpinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--sf-border);
+  border-top-color: var(--sf-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error {
+  font-size: 12px;
+  color: var(--sf-error);
+  padding: 8px 12px;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid rgba(231, 76, 60, 0.2);
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat {
+  background: var(--sf-bg-secondary);
+  border: 1px solid var(--sf-border);
+  border-radius: var(--sf-radius-md);
+  padding: 12px;
+  text-align: center;
+}
+
+.statValue {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sf-accent);
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--sf-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section {}
+
+.sectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sf-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.projectList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.projectCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--sf-bg-secondary);
+  border: 1px solid var(--sf-border);
+  border-radius: var(--sf-radius-md);
+  cursor: pointer;
+  transition: all var(--sf-transition);
+}
+
+.projectCard:hover {
+  border-color: var(--sf-accent);
+  background: var(--sf-accent-light);
+}
+
+.projectInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.projectName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sf-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.projectMeta {
+  font-size: 11px;
+  color: var(--sf-text-muted);
+}
+
+.statusBadge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.statusDraft { background: rgba(153, 153, 153, 0.2); color: #999; }
+.statusProcessing { background: rgba(243, 156, 18, 0.2); color: var(--sf-warning); }
+.statusAnalyzed { background: rgba(91, 106, 245, 0.2); color: var(--sf-accent); }
+.statusCompleted { background: rgba(46, 204, 113, 0.2); color: var(--sf-success); }
+.statusFailed { background: rgba(231, 76, 60, 0.2); color: var(--sf-error); }
+
+.processingBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--sf-warning);
+}
+
+.processingDot {
+  width: 6px;
+  height: 6px;
+  background: var(--sf-warning);
+  border-radius: 50%;
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--sf-text-muted);
+  font-size: 13px;
+}
