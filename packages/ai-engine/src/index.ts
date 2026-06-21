@@ -1,0 +1,11 @@
+export { WhisperTranscriber } from './transcription/whisper.js';
+export { ContentSegmenter } from './analysis/content-segmentation.js';
+export { HookDetector } from './analysis/hook-detection.js';
+export { RetentionScorer } from './analysis/retention-scoring.js';
+export { ViralEngine } from './analysis/viral-engine.js';
+export { EditPlanGenerator } from './generation/edit-plan.js';
+export { CaptionGenerator } from './generation/captions.js';
+export { MetadataGenerator } from './generation/metadata.js';
+export { OpenAIClient } from './clients/openai.js';
+export { ClaudeClient } from './clients/claude.js';
+export type * from './types.js';
