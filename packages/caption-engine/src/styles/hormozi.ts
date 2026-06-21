@@ -1,0 +1,27 @@
+import type { CaptionStyleConfig } from '../types.js';
+
+export const HORMOZI_STYLE: CaptionStyleConfig = {
+  name: 'HORMOZI',
+  fontFamily: 'Impact, "Arial Narrow", sans-serif',
+  fontWeight: '900',
+  fontSize: 64,
+  color: '#FFFFFF',
+  strokeColor: '#000000',
+  strokeWidth: 3,
+  shadowColor: '#000000',
+  shadowBlur: 0,
+  shadowOffsetX: 3,
+  shadowOffsetY: 3,
+  highlightColor: '#FF0000',
+  highlightStrokeColor: '#000000',
+  textTransform: 'uppercase',
+  letterSpacing: 0.05,
+  lineHeight: 1.1,
+  maxWordsPerLine: 3,
+  positionX: 0.5,
+  positionY: 0.82,
+  animationType: 'pop',
+  backgroundColor: 'transparent',
+  backgroundPadding: 0,
+  backgroundBorderRadius: 0,
+};

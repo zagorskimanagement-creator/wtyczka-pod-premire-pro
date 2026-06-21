@@ -1,0 +1,27 @@
+import type { CaptionStyleConfig } from '../types.js';
+
+export const TIKTOK_STYLE: CaptionStyleConfig = {
+  name: 'TIKTOK',
+  fontFamily: '"Arial Black", Impact, sans-serif',
+  fontWeight: '900',
+  fontSize: 52,
+  color: '#FFFFFF',
+  strokeColor: '#000000',
+  strokeWidth: 2,
+  shadowColor: 'rgba(0,0,0,0.8)',
+  shadowBlur: 4,
+  shadowOffsetX: 2,
+  shadowOffsetY: 2,
+  highlightColor: '#FFFC00',
+  highlightStrokeColor: '#000000',
+  textTransform: 'uppercase',
+  letterSpacing: 0.02,
+  lineHeight: 1.2,
+  maxWordsPerLine: 4,
+  positionX: 0.5,
+  positionY: 0.8,
+  animationType: 'pop',
+  backgroundColor: 'transparent',
+  backgroundPadding: 0,
+  backgroundBorderRadius: 0,
+};

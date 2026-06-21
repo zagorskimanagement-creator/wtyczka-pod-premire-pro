@@ -1,0 +1,27 @@
+import type { CaptionStyleConfig } from '../types.js';
+
+export const MRBEAST_STYLE: CaptionStyleConfig = {
+  name: 'MRBEAST',
+  fontFamily: '"Arial Black", Impact, sans-serif',
+  fontWeight: '900',
+  fontSize: 72,
+  color: '#FFD700',
+  strokeColor: '#000000',
+  strokeWidth: 4,
+  shadowColor: '#000000',
+  shadowBlur: 0,
+  shadowOffsetX: 4,
+  shadowOffsetY: 4,
+  highlightColor: '#FF6B00',
+  highlightStrokeColor: '#000000',
+  textTransform: 'uppercase',
+  letterSpacing: 0.04,
+  lineHeight: 1.15,
+  maxWordsPerLine: 3,
+  positionX: 0.5,
+  positionY: 0.85,
+  animationType: 'bounce',
+  backgroundColor: 'transparent',
+  backgroundPadding: 0,
+  backgroundBorderRadius: 0,
+};
