@@ -1,108 +1,7 @@
-declare const app: PPro.Application;
-declare const qe: PPro.QEApplication;
-
-namespace PPro {
-  export interface Application {
-    project: Project;
-    enableQE(): void;
-  }
-  export interface QEApplication {
-    sequence: QESequence;
-  }
-  export interface QESequence {
-    videoTrack: (index: number) => QETrack;
-    audioTrack: (index: number) => QETrack;
-    numVideoTracks: number;
-    numAudioTracks: number;
-  }
-  export interface QETrack {
-    clip: (index: number) => QEClip;
-    numItems: number;
-  }
-  export interface QEClip {
-    duration: { seconds: number };
-    inPoint: { seconds: number };
-    remove(ripple: boolean, alignToVideo: boolean): void;
-  }
-  export interface Project {
-    sequences: Sequences;
-    activeSequence: Sequence | null;
-    importFiles(paths: string[], suppressUI: boolean, targetBin: unknown | null, importAsNumberedStills: boolean): void;
-    rootItem: ProjectItem;
-  }
-  export interface Sequences {
-    [index: number]: Sequence;
-    length: number;
-    createSequence(name: string, sequencePresetPath: string): Sequence;
-  }
-  export interface Sequence {
-    id: string;
-    name: string;
-    duration: Time;
-    videoTracks: VideoTracks;
-    audioTracks: AudioTracks;
-    getPlayerPosition(): Time;
-    setPlayerPosition(position: string): void;
-    insertClip(clip: ProjectItem, time: Time, videoTrackIndex: number, audioTrackIndex: number): void;
-  }
-  export interface VideoTracks {
-    length: number;
-    [index: number]: VideoTrack;
-    insertTrack(index: number): void;
-    removeTrack(index: number): void;
-  }
-  export interface AudioTracks {
-    length: number;
-    [index: number]: AudioTrack;
-  }
-  export interface VideoTrack {
-    id: string;
-    clips: TrackItems;
-    insertClip(clip: ProjectItem, time: Time): void;
-  }
-  export interface AudioTrack {
-    id: string;
-    clips: TrackItems;
-  }
-  export interface TrackItems {
-    length: number;
-    [index: number]: TrackItem;
-  }
-  export interface TrackItem {
-    start: Time;
-    end: Time;
-    duration: Time;
-    name: string;
-    mediaType: string;
-    getSpeed(): number;
-    setSpeed(speed: number): void;
-    getComponentByDisplayName(name: string): Component | null;
-    addVideoEffect(effectMatchName: string): void;
-  }
-  export interface Component {
-    properties: Properties;
-  }
-  export interface Properties {
-    [index: number]: Property;
-    length: number;
-    getParamForDisplayName(name: string): Property | null;
-  }
-  export interface Property {
-    displayName: string;
-    setValue(value: unknown, updateUI?: boolean): void;
-    setValueAtTime(time: Time, value: unknown): void;
-    addKey(time: Time): void;
-  }
-  export interface Time {
-    seconds: number;
-    ticks: string;
-  }
-  export interface ProjectItem {
-    name: string;
-    nodeId: string;
-    treePath: string;
-  }
-}
+// CSInterface is loaded via <script src="./CSInterface.js"> in index.html
+declare const CSInterface: new () => {
+  evalScript(script: string, callback?: (result: string) => void): void;
+};
 
 export interface CutInstruction {
   startMs: number;
@@ -145,162 +44,58 @@ export interface EditPlanInstructions {
   effects: EffectInstruction[];
 }
 
+function evalScript(script: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof CSInterface === 'undefined') {
+      resolve(JSON.stringify({ error: 'Running outside Premiere Pro' }));
+      return;
+    }
+    new CSInterface().evalScript(script, (result) => resolve(result ?? '{}'));
+  });
+}
+
 export class TimelineManager {
-  private getActiveSequence(): PPro.Sequence {
-    const sequence = app.project.activeSequence;
-    if (!sequence) throw new Error('No active sequence. Please open a sequence in Premiere Pro.');
-    return sequence;
-  }
-
-  private ticksPerSecond = 254016000000;
-
-  private msToTicks(ms: number): string {
-    return Math.round((ms / 1000) * this.ticksPerSecond).toString();
-  }
-
   async importVideoToProject(filePath: string): Promise<void> {
-    await app.project.importFiles([filePath], true, null, false);
+    await evalScript(`importVideo(${JSON.stringify(filePath)})`);
   }
 
-  async createNewSequence(name: string): Promise<PPro.Sequence> {
-    return app.project.sequences.createSequence(name, '');
+  async createNewSequence(name: string): Promise<void> {
+    await evalScript(`createSequence(${JSON.stringify(name)})`);
   }
 
   async applyEditPlan(instructions: EditPlanInstructions): Promise<void> {
-    const sequence = this.getActiveSequence();
-
     for (const cut of instructions.cuts) {
       if (cut.type === 'remove') {
-        await this.removeCut(sequence, cut.startMs, cut.endMs);
+        await evalScript(`removeCut(${cut.startMs}, ${cut.endMs})`);
       }
     }
-
-    if (instructions.zooms.length > 0) {
-      await this.applyZooms(sequence, instructions.zooms);
+    for (const zoom of instructions.zooms) {
+      await evalScript(`applyZoom(${zoom.startMs}, ${zoom.endMs}, ${zoom.scale})`);
     }
-
-    if (instructions.effects.length > 0) {
-      await this.applyEffects(sequence, instructions.effects);
-    }
-
-    if (instructions.captions.length > 0) {
-      await this.addCaptions(sequence, instructions.captions);
-    }
-  }
-
-  private async removeCut(_sequence: PPro.Sequence, startMs: number, endMs: number): Promise<void> {
-    try {
-      app.enableQE();
-      const qeSeq = qe.sequence;
-
-      for (let i = 0; i < qeSeq.numVideoTracks; i++) {
-        const track = qeSeq.videoTrack(i);
-        for (let j = 0; j < track.numItems; j++) {
-          const clip = track.clip(j);
-          const clipStartSeconds = clip.inPoint.seconds;
-          const clipDurationSeconds = clip.duration.seconds;
-          const clipEndSeconds = clipStartSeconds + clipDurationSeconds;
-          const cutStartSeconds = startMs / 1000;
-          const cutEndSeconds = endMs / 1000;
-
-          if (clipStartSeconds <= cutStartSeconds && clipEndSeconds >= cutEndSeconds) {
-            clip.remove(true, true);
-            break;
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[TimelineManager] Could not remove cut:', err);
-    }
-  }
-
-  private async applyZooms(sequence: PPro.Sequence, zooms: ZoomInstruction[]): Promise<void> {
-    const videoTrack = sequence.videoTracks[0];
-    if (!videoTrack) return;
-
-    for (const zoom of zooms) {
-      for (let i = 0; i < videoTrack.clips.length; i++) {
-        const clip = videoTrack.clips[i];
-        if (!clip) continue;
-
-        const clipStartMs = clip.start.seconds * 1000;
-        const clipEndMs = clip.end.seconds * 1000;
-
-        if (zoom.startMs >= clipStartMs && zoom.endMs <= clipEndMs) {
-          try {
-            const motionEffect = clip.getComponentByDisplayName('Motion');
-            if (motionEffect) {
-              const scaleParam = motionEffect.properties.getParamForDisplayName('Scale');
-              if (scaleParam) {
-                const startTime = { seconds: zoom.startMs / 1000, ticks: this.msToTicks(zoom.startMs) };
-                const endTime = { seconds: zoom.endMs / 1000, ticks: this.msToTicks(zoom.endMs) };
-                scaleParam.addKey(startTime);
-                scaleParam.addKey(endTime);
-                scaleParam.setValueAtTime(startTime, 100);
-                scaleParam.setValueAtTime(endTime, zoom.scale * 100);
-              }
-            }
-          } catch (err) {
-            console.warn('[TimelineManager] Could not apply zoom:', err);
-          }
-        }
-      }
-    }
-  }
-
-  private async applyEffects(sequence: PPro.Sequence, effects: EffectInstruction[]): Promise<void> {
-    const videoTrack = sequence.videoTracks[0];
-    if (!videoTrack) return;
-
-    for (const effect of effects) {
-      if (effect.type === 'color-grade') {
-        for (let i = 0; i < videoTrack.clips.length; i++) {
-          const clip = videoTrack.clips[i];
-          if (!clip) continue;
-
-          try {
-            clip.addVideoEffect('AE.ADBE Saturation');
-          } catch (err) {
-            console.warn('[TimelineManager] Could not apply color grade:', err);
-          }
-        }
-      }
-    }
-  }
-
-  async addCaptions(_sequence: PPro.Sequence, captions: CaptionInstruction[]): Promise<void> {
-    for (const caption of captions) {
-      try {
-        console.warn(
-          `[ShortForge] Adding caption: "${caption.text}" at ${caption.startMs}ms-${caption.endMs}ms`,
-        );
-      } catch (err) {
-        console.warn('[TimelineManager] Could not add caption:', err);
-      }
+    for (const caption of instructions.captions) {
+      console.log(`[ShortForge] Caption: "${caption.text}" ${caption.startMs}-${caption.endMs}ms`);
     }
   }
 
   async setPlayheadPosition(timeMs: number): Promise<void> {
-    const sequence = this.getActiveSequence();
-    sequence.setPlayerPosition(this.msToTicks(timeMs));
+    await evalScript(`setPlayheadPosition(${timeMs})`);
   }
 
   async getCurrentPlayheadMs(): Promise<number> {
-    const sequence = this.getActiveSequence();
-    const position = sequence.getPlayerPosition();
-    return position.seconds * 1000;
+    const result = await evalScript('getCurrentPlayheadMs()');
+    try { return (JSON.parse(result) as { ms?: number }).ms ?? 0; } catch { return 0; }
   }
 
-  getSequenceInfo(): { name: string; durationMs: number; videoTrackCount: number } | null {
+  async getSequenceInfo(): Promise<{ name: string; durationMs: number; videoTrackCount: number } | null> {
+    const result = await evalScript('getActiveSequenceInfo()');
     try {
-      const sequence = this.getActiveSequence();
+      const data = JSON.parse(result) as { error?: string; name?: string; durationMs?: number; videoTrackCount?: number };
+      if (data.error) return null;
       return {
-        name: sequence.name,
-        durationMs: sequence.duration.seconds * 1000,
-        videoTrackCount: sequence.videoTracks.length,
+        name: data.name ?? '',
+        durationMs: data.durationMs ?? 0,
+        videoTrackCount: data.videoTrackCount ?? 0,
       };
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 }
