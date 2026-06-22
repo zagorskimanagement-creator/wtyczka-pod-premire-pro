@@ -1,0 +1,88 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: var(--sf-text-secondary);
+  font-size: 13px;
+}
+
+.loadingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--sf-border);
+  border-top-color: var(--sf-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--sf-bg-secondary);
+  border-bottom: 1px solid var(--sf-border);
+  flex-shrink: 0;
+  height: 44px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sf-accent);
+  font-size: 14px;
+}
+
+.logo strong {
+  color: var(--sf-text-primary);
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+}
+
+.navBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--sf-text-muted);
+  border-radius: var(--sf-radius-sm);
+  cursor: pointer;
+  transition: all var(--sf-transition);
+}
+
+.navBtn:hover {
+  background: var(--sf-bg-tertiary);
+  color: var(--sf-text-primary);
+}
+
+.navBtn.active {
+  background: var(--sf-accent-light);
+  color: var(--sf-accent);
+}
+
+.main {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}

@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole { FREE PRO BUSINESS ADMIN }
+enum ProjectStatus { DRAFT PROCESSING ANALYZED EDITING COMPLETED FAILED }
+enum ExportStatus { PENDING PROCESSING COMPLETED FAILED }
+enum VideoStatus { UPLOADING UPLOADED PROCESSING TRANSCRIBED ANALYZED FAILED }
+enum ClipPlatform { TIKTOK INSTAGRAM_REELS YOUTUBE_SHORTS }
+enum CaptionStyle { TIKTOK HORMOZI GADZHI MRBEAST }
+
+model User {
+  id              String        @id @default(cuid())
+  email           String        @unique
+  name            String?
+  avatarUrl       String?
+  role            UserRole      @default(FREE)
+  stripeCustomerId String?      @unique
+  apiKey          String?       @unique @default(cuid())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  lastLoginAt     DateTime?
+  projects        Project[]
+  exports         Export[]
+  analyticsEvents AnalyticsEvent[]
+  @@index([email])
+  @@index([apiKey])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  status      ProjectStatus @default(DRAFT)
+  platform    ClipPlatform  @default(TIKTOK)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  completedAt DateTime?
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videos      Video[]
+  clips       Clip[]
+  exports     Export[]
+  editPlan    EditPlan?
+  @@index([userId])
+  @@index([status])
+}
+
+model Video {
+  id              String      @id @default(cuid())
+  projectId       String
+  originalName    String
+  storagePath     String
+  storageUrl      String?
+  mimeType        String
+  sizeBytes       BigInt
+  durationSeconds Float?
+  width           Int?
+  height          Int?
+  fps             Float?
+  bitrate         Int?
+  status          VideoStatus @default(UPLOADING)
+  uploadedAt      DateTime    @default(now())
+  processedAt     DateTime?
+  metadata        Json?
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transcript      Transcript?
+  analysisResult  AnalysisResult?
+  @@index([projectId])
+  @@index([status])
+}
+
+model Transcript {
+  id          String   @id @default(cuid())
+  videoId     String   @unique
+  fullText    String
+  language    String   @default("en")
+  confidence  Float?
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  words       TranscriptWord[]
+  segments    TranscriptSegment[]
+}
+
+model TranscriptWord {
+  id           String     @id @default(cuid())
+  transcriptId String
+  word         String
+  startMs      Int
+  endMs        Int
+  confidence   Float?
+  speaker      String?
+  isFiller     Boolean    @default(false)
+  isSilence    Boolean    @default(false)
+  transcript   Transcript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  @@index([transcriptId])
+  @@index([startMs, endMs])
+}
+
+model TranscriptSegment {
+  id             String     @id @default(cuid())
+  transcriptId   String
+  text           String
+  startMs        Int
+  endMs          Int
+  topic          String?
+  sentiment      String?
+  sentimentScore Float?
+  hookScore      Float?
+  retentionScore Float?
+  viralScore     Float?
+  emotionType    String?
+  speechRate     Float?
+  transcript     Transcript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  @@index([transcriptId])
+  @@index([viralScore])
+}
+
+model AnalysisResult {
+  id              String   @id @default(cuid())
+  videoId         String   @unique
+  topicsJson      Json
+  hookMomentsJson Json
+  viralClipsJson  Json
+  editPlanJson    Json?
+  overallScore    Float?
+  analyzedAt      DateTime @default(now())
+  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+}
+
+model EditPlan {
+  id                    String   @id @default(cuid())
+  projectId             String   @unique
+  cutsJson              Json
+  zoomsJson             Json
+  captionsJson          Json
+  transitionsJson       Json
+  effectsJson           Json
+  brollJson             Json?
+  titleSuggestion       String?
+  descriptionSuggestion String?
+  hashtagsJson          Json?
+  targetDuration        Int?
+  createdAt             DateTime @default(now())
+  appliedAt             DateTime?
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clips                 Clip[]
+}
+
+model Clip {
+  id             String       @id @default(cuid())
+  projectId      String
+  editPlanId     String?
+  title          String?
+  description    String?
+  hashtags       String[]
+  platform       ClipPlatform @default(TIKTOK)
+  startMs        Int
+  endMs          Int
+  durationMs     Int
+  viralScore     Float?
+  hookScore      Float?
+  retentionScore Float?
+  captionStyle   CaptionStyle @default(TIKTOK)
+  aspectRatio    String       @default("9:16")
+  status         String       @default("pending")
+  createdAt      DateTime     @default(now())
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  editPlan       EditPlan?    @relation(fields: [editPlanId], references: [id])
+  captions       Caption[]
+  exports        Export[]
+  @@index([projectId])
+  @@index([viralScore])
+}
+
+model Caption {
+  id            String       @id @default(cuid())
+  clipId        String
+  text          String
+  startMs       Int
+  endMs         Int
+  style         CaptionStyle @default(TIKTOK)
+  wordsJson     Json?
+  positionX     Float        @default(0.5)
+  positionY     Float        @default(0.85)
+  fontSize      Int          @default(48)
+  fontFamily    String       @default("Montserrat")
+  colorHex      String       @default("#FFFFFF")
+  strokeColor   String       @default("#000000")
+  strokeWidth   Int          @default(3)
+  animationType String?
+  clip          Clip         @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  @@index([clipId])
+  @@index([startMs, endMs])
+}
+
+model Export {
+  id            String       @id @default(cuid())
+  userId        String
+  projectId     String
+  clipId        String?
+  platform      ClipPlatform @default(TIKTOK)
+  resolution    String       @default("1080x1920")
+  format        String       @default("mp4")
+  status        ExportStatus @default(PENDING)
+  storagePath   String?
+  downloadUrl   String?
+  fileSizeBytes BigInt?
+  durationMs    Int?
+  metadata      Json?
+  errorMessage  String?
+  createdAt     DateTime     @default(now())
+  completedAt   DateTime?
+  user          User         @relation(fields: [userId], references: [id])
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  clip          Clip?        @relation(fields: [clipId], references: [id])
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  sessionId  String?
+  event      String
+  properties Json?
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  userAgent  String?
+  platform   String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([userId])
+  @@index([event])
+  @@index([timestamp])
+}
+
+model JobQueue {
+  id           String   @id @default(cuid())
+  jobId        String   @unique
+  type         String
+  status       String   @default("pending")
+  payload      Json
+  result       Json?
+  errorMessage String?
+  attempts     Int      @default(0)
+  maxAttempts  Int      @default(3)
+  createdAt    DateTime @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+  @@index([status])
+  @@index([type])
+}

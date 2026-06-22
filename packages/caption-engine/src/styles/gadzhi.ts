@@ -1,0 +1,27 @@
+import type { CaptionStyleConfig } from '../types.js';
+
+export const GADZHI_STYLE: CaptionStyleConfig = {
+  name: 'GADZHI',
+  fontFamily: '"Montserrat", "Helvetica Neue", Arial, sans-serif',
+  fontWeight: '800',
+  fontSize: 48,
+  color: '#FFFFFF',
+  strokeColor: '#00FFFF',
+  strokeWidth: 1,
+  shadowColor: '#00FFFF',
+  shadowBlur: 20,
+  shadowOffsetX: 0,
+  shadowOffsetY: 0,
+  highlightColor: '#00FFFF',
+  highlightStrokeColor: '#00FFFF',
+  textTransform: 'uppercase',
+  letterSpacing: 0.08,
+  lineHeight: 1.3,
+  maxWordsPerLine: 4,
+  positionX: 0.5,
+  positionY: 0.78,
+  animationType: 'fade',
+  backgroundColor: 'transparent',
+  backgroundPadding: 0,
+  backgroundBorderRadius: 0,
+};

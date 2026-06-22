@@ -1,0 +1,137 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 32px 24px;
+  gap: 16px;
+}
+
+.logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--sf-accent);
+}
+
+.logo h1 {
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--sf-text-primary);
+  letter-spacing: -0.5px;
+}
+
+.logo h1 span {
+  font-weight: 700;
+  color: var(--sf-accent);
+}
+
+.tagline {
+  font-size: 12px;
+  color: var(--sf-text-secondary);
+  text-align: center;
+  max-width: 240px;
+}
+
+.form {
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 12px;
+  color: var(--sf-text-secondary);
+  font-weight: 500;
+}
+
+.field input {
+  background: var(--sf-bg-secondary);
+  border: 1px solid var(--sf-border);
+  border-radius: var(--sf-radius-sm);
+  padding: 8px 12px;
+  color: var(--sf-text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--sf-transition);
+}
+
+.field input:focus {
+  border-color: var(--sf-accent);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--sf-error);
+  text-align: center;
+  padding: 8px 12px;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: var(--sf-radius-sm);
+  border: 1px solid rgba(231, 76, 60, 0.2);
+}
+
+.submitBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--sf-accent);
+  color: white;
+  border: none;
+  border-radius: var(--sf-radius-sm);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--sf-transition);
+  margin-top: 4px;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: var(--sf-accent-hover);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.footer {
+  font-size: 12px;
+  color: var(--sf-text-muted);
+  text-align: center;
+  margin-top: 8px;
+}
+
+.footer a {
+  color: var(--sf-accent);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}

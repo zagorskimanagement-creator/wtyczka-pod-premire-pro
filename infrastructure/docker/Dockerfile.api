@@ -1,0 +1,39 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+
+FROM base AS deps
+COPY package.json ./
+COPY apps/api-server/package.json ./apps/api-server/
+COPY packages/shared/package.json ./packages/shared/
+RUN npm install --workspace=@shortforge/shared --workspace=@shortforge/api-server
+
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/api-server/node_modules ./apps/api-server/node_modules
+COPY . .
+RUN npm run build --workspace=@shortforge/shared
+RUN npm run db:generate --workspace=@shortforge/api-server
+RUN npm run build --workspace=@shortforge/api-server
+
+FROM base AS runner
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 shortforge
+
+COPY --from=builder /app/apps/api-server/dist ./dist
+COPY --from=builder /app/apps/api-server/node_modules ./node_modules
+COPY --from=builder /app/apps/api-server/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+RUN mkdir -p /tmp/shortforge/uploads /tmp/shortforge/storage && \
+    chown -R shortforge:nodejs /tmp/shortforge
+
+USER shortforge
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://localhost:3001/api/v1/health').then(r => process.exit(r.ok ? 0 : 1))"
+
+CMD ["node", "dist/index.js"]

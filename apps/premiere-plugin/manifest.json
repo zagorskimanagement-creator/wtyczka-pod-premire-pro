@@ -1,0 +1,54 @@
+{
+  "id": "com.shortforge.ai",
+  "name": "ShortForge AI",
+  "version": "1.0.0",
+  "manifestVersion": 6,
+  "host": [
+    {
+      "app": "PPro",
+      "minVersion": "23.0"
+    }
+  ],
+  "entryPoints": [
+    {
+      "type": "panel",
+      "id": "shortforge-main",
+      "label": {
+        "default": "ShortForge AI"
+      },
+      "minimumSize": {
+        "width": 380,
+        "height": 600
+      },
+      "defaultSize": {
+        "width": 420,
+        "height": 780
+      },
+      "maximumSize": {
+        "width": 1920,
+        "height": 1080
+      }
+    }
+  ],
+  "requiredPermissions": {
+    "localFileSystem": "fullAccess",
+    "network": {
+      "domains": [
+        "https://api.shortforge.ai",
+        "http://localhost:3001",
+        "wss://api.shortforge.ai"
+      ]
+    },
+    "ipc": {
+      "enablePluginCommunicationAPIs": true
+    },
+    "clipboard": "readAndWrite",
+    "launchProcess": {
+      "schemes": ["https", "http"]
+    }
+  },
+  "featureFlags": {
+    "enableSWCSupport": false,
+    "enableFuseV2Support": true
+  }
+}
