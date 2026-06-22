@@ -1,0 +1,23 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useState, useEffect } from 'react';
+import { Dashboard } from './ui/components/Dashboard.js';
+import { Editor } from './ui/components/Editor.js';
+import { ExportPanel } from './ui/components/ExportPanel.js';
+import { Settings } from './ui/components/Settings.js';
+import { LoginScreen } from './ui/components/LoginScreen.js';
+import { useStore } from './ui/store/index.js';
+import styles from './App.module.css';
+export default function App() {
+    const [activeScreen, setActiveScreen] = useState('dashboard');
+    const { token, isInitialized, initialize } = useStore();
+    useEffect(() => {
+        void initialize();
+    }, [initialize]);
+    if (!isInitialized) {
+        return (_jsxs("div", { className: styles.loading, children: [_jsx("div", { className: styles.loadingSpinner }), _jsx("span", { children: "Loading ShortForge AI..." })] }));
+    }
+    if (!token) {
+        return _jsx(LoginScreen, {});
+    }
+    return (_jsxs("div", { className: styles.app, children: [_jsxs("header", { className: styles.header, children: [_jsxs("div", { className: styles.logo, children: [_jsx("svg", { width: "20", height: "20", viewBox: "0 0 24 24", fill: "currentColor", children: _jsx("path", { d: "M13 2L3 14h9l-1 8 10-12h-9l1-8z" }) }), _jsxs("span", { children: ["ShortForge ", _jsx("strong", { children: "AI" })] })] }), _jsxs("nav", { className: styles.nav, children: [_jsx("button", { className: `${styles.navBtn} ${activeScreen === 'dashboard' ? styles.active : ''}`, onClick: () => setActiveScreen('dashboard'), title: "Dashboard", children: _jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", children: [_jsx("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1" }), _jsx("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1" }), _jsx("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1" }), _jsx("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1" })] }) }), _jsx("button", { className: `${styles.navBtn} ${activeScreen === 'editor' ? styles.active : ''}`, onClick: () => setActiveScreen('editor'), title: "Editor", children: _jsx("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", children: _jsx("path", { d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" }) }) }), _jsx("button", { className: `${styles.navBtn} ${activeScreen === 'export' ? styles.active : ''}`, onClick: () => setActiveScreen('export'), title: "Export", children: _jsx("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", children: _jsx("path", { d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }) }), _jsx("button", { className: `${styles.navBtn} ${activeScreen === 'settings' ? styles.active : ''}`, onClick: () => setActiveScreen('settings'), title: "Settings", children: _jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", children: [_jsx("path", { d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" }), _jsx("circle", { cx: "12", cy: "12", r: "3" })] }) })] })] }), _jsxs("main", { className: styles.main, children: [activeScreen === 'dashboard' && _jsx(Dashboard, { onNavigate: setActiveScreen }), activeScreen === 'editor' && _jsx(Editor, { onNavigate: setActiveScreen }), activeScreen === 'export' && _jsx(ExportPanel, { onNavigate: setActiveScreen }), activeScreen === 'settings' && _jsx(Settings, { onNavigate: setActiveScreen })] })] }));
+}
