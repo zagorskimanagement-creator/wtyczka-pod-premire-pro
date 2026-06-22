@@ -14,14 +14,7 @@
     "sourceMap": true,
     "outDir": "dist",
     "rootDir": "src",
-    "paths": {
-      "@shortforge/shared": ["./packages/shared/src/index.ts"],
-      "@shortforge/ai-engine": ["./packages/ai-engine/src/index.ts"],
-      "@shortforge/video-engine": ["./packages/video-engine/src/index.ts"],
-      "@shortforge/timeline-engine": ["./packages/timeline-engine/src/index.ts"],
-      "@shortforge/caption-engine": ["./packages/caption-engine/src/index.ts"],
-      "@shortforge/analytics": ["./packages/analytics/src/index.ts"]
-    }
+    "paths": {}
   },
   "exclude": ["node_modules", "dist", "build", "coverage"]
 }

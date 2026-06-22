@@ -2,40 +2,40 @@ declare const app: PPro.Application;
 declare const qe: PPro.QEApplication;
 
 namespace PPro {
-  interface Application {
+  export interface Application {
     project: Project;
     enableQE(): void;
   }
-  interface QEApplication {
+  export interface QEApplication {
     sequence: QESequence;
   }
-  interface QESequence {
+  export interface QESequence {
     videoTrack: (index: number) => QETrack;
     audioTrack: (index: number) => QETrack;
     numVideoTracks: number;
     numAudioTracks: number;
   }
-  interface QETrack {
+  export interface QETrack {
     clip: (index: number) => QEClip;
     numItems: number;
   }
-  interface QEClip {
+  export interface QEClip {
     duration: { seconds: number };
     inPoint: { seconds: number };
     remove(ripple: boolean, alignToVideo: boolean): void;
   }
-  interface Project {
+  export interface Project {
     sequences: Sequences;
     activeSequence: Sequence | null;
     importFiles(paths: string[], suppressUI: boolean, targetBin: unknown | null, importAsNumberedStills: boolean): void;
     rootItem: ProjectItem;
   }
-  interface Sequences {
+  export interface Sequences {
     [index: number]: Sequence;
     length: number;
     createSequence(name: string, sequencePresetPath: string): Sequence;
   }
-  interface Sequence {
+  export interface Sequence {
     id: string;
     name: string;
     duration: Time;
@@ -45,30 +45,30 @@ namespace PPro {
     setPlayerPosition(position: string): void;
     insertClip(clip: ProjectItem, time: Time, videoTrackIndex: number, audioTrackIndex: number): void;
   }
-  interface VideoTracks {
+  export interface VideoTracks {
     length: number;
     [index: number]: VideoTrack;
     insertTrack(index: number): void;
     removeTrack(index: number): void;
   }
-  interface AudioTracks {
+  export interface AudioTracks {
     length: number;
     [index: number]: AudioTrack;
   }
-  interface VideoTrack {
+  export interface VideoTrack {
     id: string;
     clips: TrackItems;
     insertClip(clip: ProjectItem, time: Time): void;
   }
-  interface AudioTrack {
+  export interface AudioTrack {
     id: string;
     clips: TrackItems;
   }
-  interface TrackItems {
+  export interface TrackItems {
     length: number;
     [index: number]: TrackItem;
   }
-  interface TrackItem {
+  export interface TrackItem {
     start: Time;
     end: Time;
     duration: Time;
@@ -79,25 +79,25 @@ namespace PPro {
     getComponentByDisplayName(name: string): Component | null;
     addVideoEffect(effectMatchName: string): void;
   }
-  interface Component {
+  export interface Component {
     properties: Properties;
   }
-  interface Properties {
+  export interface Properties {
     [index: number]: Property;
     length: number;
     getParamForDisplayName(name: string): Property | null;
   }
-  interface Property {
+  export interface Property {
     displayName: string;
     setValue(value: unknown, updateUI?: boolean): void;
     setValueAtTime(time: Time, value: unknown): void;
     addKey(time: Time): void;
   }
-  interface Time {
+  export interface Time {
     seconds: number;
     ticks: string;
   }
-  interface ProjectItem {
+  export interface ProjectItem {
     name: string;
     nodeId: string;
     treePath: string;
@@ -158,18 +158,12 @@ export class TimelineManager {
     return Math.round((ms / 1000) * this.ticksPerSecond).toString();
   }
 
-  private secondsToTicks(seconds: number): string {
-    return Math.round(seconds * this.ticksPerSecond).toString();
-  }
-
   async importVideoToProject(filePath: string): Promise<void> {
     await app.project.importFiles([filePath], true, null, false);
   }
 
   async createNewSequence(name: string): Promise<PPro.Sequence> {
-    const preset = '/Applications/Adobe Premiere Pro 2024/Adobe Premiere Pro 2024.app/Contents/Lumetri/LUTs/creative/';
-    const sequence = await app.project.sequences.createSequence(name, '');
-    return sequence;
+    return app.project.sequences.createSequence(name, '');
   }
 
   async applyEditPlan(instructions: EditPlanInstructions): Promise<void> {
@@ -194,7 +188,7 @@ export class TimelineManager {
     }
   }
 
-  private async removeCut(sequence: PPro.Sequence, startMs: number, endMs: number): Promise<void> {
+  private async removeCut(_sequence: PPro.Sequence, startMs: number, endMs: number): Promise<void> {
     try {
       app.enableQE();
       const qeSeq = qe.sequence;
@@ -274,12 +268,9 @@ export class TimelineManager {
     }
   }
 
-  async addCaptions(sequence: PPro.Sequence, captions: CaptionInstruction[]): Promise<void> {
+  async addCaptions(_sequence: PPro.Sequence, captions: CaptionInstruction[]): Promise<void> {
     for (const caption of captions) {
       try {
-        const startTime = { seconds: caption.startMs / 1000, ticks: this.msToTicks(caption.startMs) };
-        const endTime = { seconds: caption.endMs / 1000, ticks: this.msToTicks(caption.endMs) };
-
         console.warn(
           `[ShortForge] Adding caption: "${caption.text}" at ${caption.startMs}ms-${caption.endMs}ms`,
         );

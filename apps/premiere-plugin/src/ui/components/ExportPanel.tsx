@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../store/index.js';
 import { apiClient } from '../../api/client.js';
 import styles from './ExportPanel.module.css';
@@ -14,12 +14,12 @@ const RESOLUTIONS = {
 } as const;
 
 export function ExportPanel({ onNavigate }: ExportPanelProps) {
-  const { currentProject, activeExports } = useStore();
+  const { currentProject } = useStore();
   const [platform, setPlatform] = useState<'TIKTOK' | 'INSTAGRAM_REELS' | 'YOUTUBE_SHORTS'>('TIKTOK');
   const [quality, setQuality] = useState<'high' | 'medium' | 'low'>('high');
   const [burnCaptions, setBurnCaptions] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportId, setExportId] = useState<string | null>(null);
+  const [, setExportId] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState('');

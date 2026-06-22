@@ -63,7 +63,7 @@ export async function analysisProcessor(
     language: transcriptData.language,
     confidence: transcriptData.confidence ?? 0.9,
     durationMs: transcriptData.durationMs ?? 0,
-    words: transcriptData.words.map((w) => ({
+    words: transcriptData.words.map((w: { word: string; startMs: number; endMs: number; confidence: number | null }) => ({
       word: w.word,
       start: w.startMs / 1000,
       end: w.endMs / 1000,

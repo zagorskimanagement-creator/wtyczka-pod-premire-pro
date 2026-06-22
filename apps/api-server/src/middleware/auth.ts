@@ -4,7 +4,7 @@ import { UnauthorizedError } from './error-handler.js';
 
 export interface JwtPayload { sub: string; email: string; role: string; iat: number; exp: number; }
 
-declare module 'fastify' { interface FastifyRequest { user: JwtPayload; } }
+declare module '@fastify/jwt' { interface FastifyJWT { user: JwtPayload; } }
 
 export async function authenticate(request: FastifyRequest, _reply: FastifyReply) {
   const apiKey = request.headers['x-api-key'] as string | undefined;

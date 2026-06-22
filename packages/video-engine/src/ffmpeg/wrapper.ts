@@ -29,7 +29,7 @@ export class FFmpegWrapper {
           height: videoStream.height ?? 1080,
           fps,
           durationSeconds: metadata.format.duration ?? 0,
-          bitrate: metadata.format.bit_rate ? parseInt(metadata.format.bit_rate, 10) : 0,
+          bitrate: metadata.format.bit_rate ?? 0,
           codec: videoStream.codec_name ?? 'h264',
           audioCodec: audioStream?.codec_name ?? 'aac',
           hasAudio: !!audioStream,

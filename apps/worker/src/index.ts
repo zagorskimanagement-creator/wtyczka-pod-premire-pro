@@ -1,5 +1,4 @@
 import { Worker, WorkerOptions } from 'bullmq';
-import Redis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { transcriptionProcessor } from './processors/transcription.js';
 import { analysisProcessor } from './processors/analysis.js';
@@ -9,10 +8,20 @@ import { exportProcessor } from './processors/export.js';
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 const CONCURRENCY = parseInt(process.env['WORKER_CONCURRENCY'] ?? '5', 10);
 
-const connection = new Redis(REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
+const parseRedisUrl = (url: string): { host: string; port: number; password?: string } => {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname || '127.0.0.1',
+      port: parseInt(parsed.port || '6379', 10),
+      ...(parsed.password ? { password: parsed.password } : {}),
+    };
+  } catch {
+    return { host: '127.0.0.1', port: 6379 };
+  }
+};
+
+const connection = parseRedisUrl(REDIS_URL);
 
 export const prisma = new PrismaClient();
 
@@ -68,7 +77,6 @@ async function shutdown() {
   console.warn('[Worker] Shutting down gracefully...');
   await Promise.all(workers.map((w) => w.close()));
   await prisma.$disconnect();
-  await connection.quit();
   process.exit(0);
 }
 
