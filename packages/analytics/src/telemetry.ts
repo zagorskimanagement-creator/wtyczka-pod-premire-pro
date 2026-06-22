@@ -7,7 +7,9 @@ let initialized = false;
 export function initTelemetry(config: TelemetryConfig): void {
   if (initialized || !config.enabled) return;
   if (config.sentryDsn) {
-    Sentry.init({ dsn: config.sentryDsn, environment: config.environment, release: config.release, tracesSampleRate: config.tracesSampleRate, integrations: [Sentry.httpIntegration(), Sentry.expressIntegration()] });
+    Sentry.init({ dsn: config.sentryDsn, environment: config.environment, release: config.release, tracesSampleRate: config.tracesSampleRate, integrations: [
+  Sentry.httpIntegration()
+] });
   }
   initialized = true;
 }
