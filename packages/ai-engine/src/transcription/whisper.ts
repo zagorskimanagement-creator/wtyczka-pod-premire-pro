@@ -71,6 +71,7 @@ export class WhisperTranscriber {
 
   private buildSegments(words: TranscriptWord[]) {
     const segments: Array<{
+      id: string;
       text: string;
       startMs: number;
       endMs: number;
@@ -79,6 +80,7 @@ export class WhisperTranscriber {
       isSilence: boolean;
     }> = [];
 
+    let segIdx = 0;
     let currentGroup: TranscriptWord[] = [];
     let lastEndMs = 0;
 
@@ -89,8 +91,9 @@ export class WhisperTranscriber {
       const isFiller = FILLER_WORDS.has(word.word.toLowerCase());
 
       if (gap > SILENCE_THRESHOLD_MS && currentGroup.length > 0) {
-        segments.push(this.buildSegment(currentGroup, false, false));
+        segments.push(this.buildSegment(currentGroup, false, false, segIdx++));
         segments.push({
+          id: `seg_${segIdx++}`,
           text: '',
           startMs: lastEndMs,
           endMs: startMs,
@@ -103,10 +106,10 @@ export class WhisperTranscriber {
 
       if (isFiller) {
         if (currentGroup.length > 0) {
-          segments.push(this.buildSegment(currentGroup, false, false));
+          segments.push(this.buildSegment(currentGroup, false, false, segIdx++));
           currentGroup = [];
         }
-        segments.push(this.buildSegment([word], true, false));
+        segments.push(this.buildSegment([word], true, false, segIdx++));
       } else {
         currentGroup.push(word);
       }
@@ -115,14 +118,15 @@ export class WhisperTranscriber {
     }
 
     if (currentGroup.length > 0) {
-      segments.push(this.buildSegment(currentGroup, false, false));
+      segments.push(this.buildSegment(currentGroup, false, false, segIdx++));
     }
 
     return segments;
   }
 
-  private buildSegment(words: TranscriptWord[], isFiller: boolean, isSilence: boolean) {
+  private buildSegment(words: TranscriptWord[], isFiller: boolean, isSilence: boolean, index: number) {
     return {
+      id: `seg_${index}`,
       text: words.map((w) => w.word).join(' '),
       startMs: Math.round(words[0].start * 1000),
       endMs: Math.round(words[words.length - 1].end * 1000),

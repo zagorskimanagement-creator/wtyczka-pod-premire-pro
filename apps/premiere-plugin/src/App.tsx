@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Dashboard } from './ui/components/Dashboard.js';
 import { Editor } from './ui/components/Editor.js';
 import { ExportPanel } from './ui/components/ExportPanel.js';

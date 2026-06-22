@@ -25,7 +25,7 @@ export const captionRoutes: FastifyPluginAsync = async (fastify) => {
     const body = generateCaptionsSchema.parse(request.body);
     const clip = await prisma.clip.findFirst({ where: { id: body.clipId, project: { userId: request.user.sub } }, include: { project: { include: { videos: { include: { transcript: { include: { words: true } } } } } } } });
     if (!clip) throw new AppError(404, 'Clip not found');
-    const words = clip.project.videos[0]?.transcript?.words.filter((w) => w.startMs >= clip.startMs && w.endMs <= clip.endMs) ?? [];
+    const words = clip.project.videos[0]?.transcript?.words.filter((w: { startMs: number; endMs: number }) => w.startMs >= clip.startMs && w.endMs <= clip.endMs) ?? [];
     const captionGroups = groupWordsIntoCaptions(words, body.maxWordsPerLine);
     await prisma.caption.deleteMany({ where: { clipId: body.clipId } });
     const captions = await prisma.caption.createMany({ data: captionGroups.map((group) => ({ clipId: body.clipId, text: group.text, startMs: group.startMs, endMs: group.endMs, style: body.style, wordsJson: group.words as unknown as Record<string, unknown>[], positionX: 0.5, positionY: body.positionY, fontSize: body.fontSize, fontFamily: body.fontFamily, colorHex: body.colorHex, strokeColor: body.strokeColor, strokeWidth: body.strokeWidth, animationType: body.animation })) });

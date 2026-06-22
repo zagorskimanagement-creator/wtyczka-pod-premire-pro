@@ -1,1 +1,37 @@
-{\n  \"name\": \"shortforge-ai\",\n  \"version\": \"1.0.0\",\n  \"private\": true,\n  \"workspaces\": [\n    \"apps/*\",\n    \"packages/*\"\n  ],\n  \"scripts\": {\n    \"build\": \"turbo run build\",\n    \"dev\": \"turbo run dev\",\n    \"test\": \"turbo run test\",\n    \"lint\": \"turbo run lint\",\n    \"typecheck\": \"turbo run typecheck\",\n    \"clean\": \"turbo run clean && rm -rf node_modules\",\n    \"db:generate\": \"cd apps/api-server && npx prisma generate\",\n    \"db:migrate\": \"cd apps/api-server && npx prisma migrate dev\",\n    \"db:studio\": \"cd apps/api-server && npx prisma studio\",\n    \"docker:up\": \"docker compose -f infrastructure/docker/docker-compose.yml up -d\",\n    \"docker:down\": \"docker compose -f infrastructure/docker/docker-compose.yml down\",\n    \"docker:build\": \"docker compose -f infrastructure/docker/docker-compose.yml build\"\n  },\n  \"devDependencies\": {\n    \"@types/node\": \"^20.11.0\",\n    \"turbo\": \"^1.12.4\",\n    \"typescript\": \"^5.3.3\",\n    \"prettier\": \"^3.2.4\",\n    \"eslint\": \"^8.56.0\",\n    \"@typescript-eslint/eslint-plugin\": \"^6.18.1\",\n    \"@typescript-eslint/parser\": \"^6.18.1\",\n    \"vitest\": \"^1.2.1\"\n  },\n  \"engines\": {\n    \"node\": \">=20.0.0\",\n    \"npm\": \">=10.0.0\"\n  }\n}\n
+{
+  "name": "shortforge-ai",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:generate": "cd apps/api-server && npx prisma generate",
+    "db:migrate": "cd apps/api-server && npx prisma migrate dev",
+    "db:studio": "cd apps/api-server && npx prisma studio",
+    "docker:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
+    "docker:build": "docker compose -f infrastructure/docker/docker-compose.yml build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "turbo": "^1.12.4",
+    "typescript": "^5.3.3",
+    "prettier": "^3.2.4",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
+    "vitest": "^1.2.1"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

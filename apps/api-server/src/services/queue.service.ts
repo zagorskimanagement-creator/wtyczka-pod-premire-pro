@@ -1,7 +1,22 @@
 import { Queue } from 'bullmq';
-import { redisClient } from '../lib/redis.js';
 
-const getConnection = () => ({ connection: redisClient });
+const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
+
+const parseRedisUrl = (url: string): { host: string; port: number; password?: string } => {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname || '127.0.0.1',
+      port: parseInt(parsed.port || '6379', 10),
+      ...(parsed.password ? { password: parsed.password } : {}),
+    };
+  } catch {
+    return { host: '127.0.0.1', port: 6379 };
+  }
+};
+
+const connection = parseRedisUrl(REDIS_URL);
+const getConnection = () => ({ connection });
 
 export interface TranscriptionJob { projectId: string; videoId: string; storagePath: string; durationSeconds: number; }
 export interface AnalysisJob { projectId: string; videoId: string; transcriptId?: string; options: { targetDuration: number; targetPlatform: string; captionStyle: string; removeFillers: boolean; removeSilence: boolean; removeRepetitions: boolean; detectHooks: boolean; detectEmotions: boolean; generateTitle: boolean; generateDescription: boolean; generateHashtags: boolean; addBRoll: boolean }; }
@@ -28,17 +43,17 @@ export class QueueService {
   }
 
   async enqueueAnalysis(data: AnalysisJob): Promise<string> {
-    const job = await this.analysisQueue.add('analyze', data, { attempts: 3, backoff: { type: 'exponential', delay: 10000 }, removeOnComplete: { age: 86400, count: 1000 }, removeOnFail: { age: 604800 }, timeout: 300000 });
+    const job = await this.analysisQueue.add('analyze', data, { attempts: 3, backoff: { type: 'exponential', delay: 10000 }, removeOnComplete: { age: 86400, count: 1000 }, removeOnFail: { age: 604800 } });
     return job.id ?? '';
   }
 
   async enqueueEditGeneration(data: EditGenerationJob): Promise<string> {
-    const job = await this.editQueue.add('generate-edit', data, { attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: { age: 86400, count: 1000 }, removeOnFail: { age: 604800 }, timeout: 120000 });
+    const job = await this.editQueue.add('generate-edit', data, { attempts: 3, backoff: { type: 'exponential', delay: 5000 }, removeOnComplete: { age: 86400, count: 1000 }, removeOnFail: { age: 604800 } });
     return job.id ?? '';
   }
 
   async enqueueExport(data: ExportJob): Promise<string> {
-    const job = await this.exportQueue.add('export', data, { attempts: 3, backoff: { type: 'exponential', delay: 10000 }, removeOnComplete: { age: 86400, count: 100 }, removeOnFail: { age: 604800 }, timeout: 600000 });
+    const job = await this.exportQueue.add('export', data, { attempts: 3, backoff: { type: 'exponential', delay: 10000 }, removeOnComplete: { age: 86400, count: 100 }, removeOnFail: { age: 604800 } });
     return job.id ?? '';
   }
 

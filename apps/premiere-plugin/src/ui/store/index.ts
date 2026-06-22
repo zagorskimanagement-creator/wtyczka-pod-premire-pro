@@ -71,7 +71,7 @@ export interface AppState {
   setActiveProject: (projectId: string | null) => void;
   setActiveClip: (clipId: string | null) => void;
   loadProjects: () => Promise<void>;
-  loadProject: (projectId: string) => Promise<void>;
+  loadProject: (projectId: string) => Promise<Project>;
   uploadVideo: (file: File, projectName: string, platform: string) => Promise<string>;
   triggerAnalysis: (projectId: string, options: AnalysisOptions) => Promise<void>;
   applyEditPlan: (projectId: string, clipIndex?: number) => Promise<ApplyEditResult>;

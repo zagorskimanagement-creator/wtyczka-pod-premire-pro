@@ -13,7 +13,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const body = registerSchema.parse(request.body);
     if (await prisma.user.findUnique({ where: { email: body.email } })) throw new ConflictError('Email already registered');
     const hashedPassword = await bcrypt.hash(body.password, 12);
-    const user = await prisma.user.create({ data: { email: body.email, name: body.name, passwordHash: hashedPassword } as Parameters<typeof prisma.user.create>[0]['data'], select: { id: true, email: true, name: true, role: true, createdAt: true } });
+    const user = await prisma.user.create({ data: { email: body.email, name: body.name, passwordHash: hashedPassword }, select: { id: true, email: true, name: true, role: true, createdAt: true } });
     const token = fastify.jwt.sign({ sub: user.id, email: user.email, role: user.role });
     return reply.status(201).send({ token, user });
   });

@@ -100,24 +100,27 @@ export class SequenceBuilder {
       startMs: c.startMs,
       endMs: c.endMs,
       style: c.style as CaptionBlock['style'],
-      positionX: c.positionX,
-      positionY: c.positionY,
-      fontSize: c.fontSize,
-      colorHex: c.colorHex,
-      strokeColor: c.strokeColor,
-      strokeWidth: c.strokeWidth,
-      animationType: (c.animationType as CaptionBlock['animationType']) ?? 'pop',
+      positionX: 0.5,
+      positionY: c.positionY ?? 0.85,
+      fontSize: c.fontSize ?? 48,
+      colorHex: '#FFFFFF',
+      strokeColor: '#000000',
+      strokeWidth: 2,
+      animationType: (c.animation as CaptionBlock['animationType']) ?? 'pop',
       words: (c.words ?? []).map((w) => ({ word: w.word, startMs: w.startMs, endMs: w.endMs })),
     }));
   }
 
   private buildZooms(editPlan: EditPlan, cuts: CutPoint[]): ZoomKeyframe[] {
     const cutSet = new Set(cuts.map((c) => c.startMs));
-    return editPlan.zooms.filter((z) => !cutSet.has(z.startMs)).flatMap((z) => [
-      { timeMs: z.startMs, scale: 1.0, centerX: z.centerX, centerY: z.centerY, easingIn: 'ease-in-out' as const, easingOut: 'ease-in-out' as const },
-      { timeMs: z.startMs + z.durationMs * 0.3, scale: z.scale, centerX: z.centerX, centerY: z.centerY, easingIn: 'ease-in-out' as const, easingOut: 'ease-in-out' as const },
-      { timeMs: z.startMs + z.durationMs, scale: 1.0, centerX: z.centerX, centerY: z.centerY, easingIn: 'ease-in-out' as const, easingOut: 'ease-in-out' as const },
-    ]);
+    return editPlan.zooms.filter((z) => !cutSet.has(z.startMs)).flatMap((z) => {
+      const durationMs = z.endMs - z.startMs;
+      return [
+        { timeMs: z.startMs, scale: 1.0, centerX: z.posX, centerY: z.posY, easingIn: 'ease-in-out' as const, easingOut: 'ease-in-out' as const },
+        { timeMs: z.startMs + durationMs * 0.3, scale: z.scale, centerX: z.posX, centerY: z.posY, easingIn: 'ease-in-out' as const, easingOut: 'ease-in-out' as const },
+        { timeMs: z.endMs, scale: 1.0, centerX: z.posX, centerY: z.posY, easingIn: 'ease-in-out' as const, easingOut: 'ease-in-out' as const },
+      ];
+    });
   }
 
   private buildTransitions(editPlan: EditPlan, segments: Array<{ start: number; end: number }>): TransitionDef[] {
@@ -126,7 +129,7 @@ export class SequenceBuilder {
     for (let i = 0; i < segments.length - 1; i++) {
       cursor += segments[i]!.end - segments[i]!.start;
       const pt = editPlan.transitions[i];
-      transitions.push({ type: (pt?.type as TransitionDef['type']) ?? 'cut', durationMs: pt?.durationMs ?? 0, atMs: cursor, direction: pt?.direction as TransitionDef['direction'] });
+      transitions.push({ type: (pt?.type as TransitionDef['type']) ?? 'cut', durationMs: pt?.durationMs ?? 0, atMs: cursor });
     }
     return transitions;
   }
@@ -137,7 +140,7 @@ export class SequenceBuilder {
       type: e.type as EffectDef['type'],
       startMs: e.startMs,
       endMs: e.endMs,
-      intensity: e.intensity,
+      intensity: (e.params['intensity'] as number | undefined) ?? 1.0,
       params: e.params as Record<string, number | string | boolean>,
     }));
     if (!effects.some((e) => e.type === 'color-grade')) {

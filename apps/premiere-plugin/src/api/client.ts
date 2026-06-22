@@ -1,4 +1,4 @@
-const BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_API_URL'] as string | undefined)
+const BASE_URL = (import.meta.env['VITE_API_URL'] as string | undefined)
   ?? 'http://localhost:3001/api/v1';
 
 class ApiClient {

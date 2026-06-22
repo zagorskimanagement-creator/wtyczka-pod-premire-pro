@@ -50,7 +50,7 @@ export async function editGenerationProcessor(
     language: transcript.language,
     confidence: transcript.confidence ?? 0.9,
     durationMs: transcript.durationMs ?? 0,
-    words: transcript.words.map((w) => ({
+    words: transcript.words.map((w: { word: string; startMs: number; endMs: number; confidence: number | null }) => ({
       word: w.word,
       start: w.startMs / 1000,
       end: w.endMs / 1000,

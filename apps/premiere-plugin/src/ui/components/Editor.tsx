@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store/index.js';
 import { TimelineManager } from '../../premiere/timeline.js';
 import styles from './Editor.module.css';
