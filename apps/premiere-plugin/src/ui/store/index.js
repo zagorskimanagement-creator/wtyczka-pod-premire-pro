@@ -58,12 +58,29 @@ export const useStore = create()(persist((set, get) => ({
         return response.project;
     },
     uploadVideo: async (file, projectName, platform) => {
-        const formData = new FormData();
-        formData.append('video', file);
-        formData.append('data', JSON.stringify({ name: projectName, platform }));
-        const response = await apiClient.postFormData('/upload', formData);
-        await get().loadProjects();
-        return response.projectId;
+        const projectId = `local-${Date.now()}`;
+        const filePath = file.path;
+        if (filePath) {
+            const { TimelineManager } = await import('../../premiere/timeline.js');
+            await new TimelineManager().importVideoToProject(filePath);
+        }
+        const project = {
+            id: projectId,
+            name: projectName,
+            status: 'DRAFT',
+            platform,
+            createdAt: new Date().toISOString(),
+            videos: [{
+                    id: `video-${Date.now()}`,
+                    status: 'READY',
+                    durationSeconds: null,
+                    storageUrl: filePath,
+                }],
+            clips: [],
+            editPlan: null,
+        };
+        set((state) => ({ projects: [project, ...state.projects] }));
+        return projectId;
     },
     triggerAnalysis: async (projectId, options) => {
         get().updateProcessingStatus(projectId, 'analyzing', 0, 'Starting analysis...');
