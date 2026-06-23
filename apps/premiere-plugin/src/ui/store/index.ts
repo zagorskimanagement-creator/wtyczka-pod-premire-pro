@@ -156,7 +156,12 @@ export const useStore = create<AppState>()(
       setActiveProject: (projectId) => {
         set({ activeProjectId: projectId });
         if (projectId) {
-          void get().loadProject(projectId);
+          const local = get().projects.find((p) => p.id === projectId);
+          if (local) {
+            set({ currentProject: local });
+          } else {
+            void get().loadProject(projectId).catch(() => {});
+          }
         }
       },
 

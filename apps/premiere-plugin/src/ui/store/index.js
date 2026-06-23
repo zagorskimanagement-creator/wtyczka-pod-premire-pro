@@ -42,7 +42,13 @@ export const useStore = create()(persist((set, get) => ({
     setActiveProject: (projectId) => {
         set({ activeProjectId: projectId });
         if (projectId) {
-            void get().loadProject(projectId);
+            const local = get().projects.find((p) => p.id === projectId);
+            if (local) {
+                set({ currentProject: local });
+            }
+            else {
+                void get().loadProject(projectId).catch(() => { });
+            }
         }
     },
     setActiveClip: (clipId) => {
