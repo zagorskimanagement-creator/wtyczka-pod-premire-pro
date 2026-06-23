@@ -9,7 +9,7 @@ export function Dashboard({ onNavigate }) {
     const [uploadError, setUploadError] = useState('');
     const fileInputRef = useRef(null);
     useEffect(() => {
-        void loadProjects();
+        void loadProjects().catch(() => { });
     }, [loadProjects]);
     const handleFileUpload = async (file) => {
         const validTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
