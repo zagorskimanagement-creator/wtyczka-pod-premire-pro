@@ -7,42 +7,51 @@ interface SettingsProps {
 }
 
 export function Settings({ onNavigate: _ }: SettingsProps) {
-  const { user, logout } = useStore();
-  const [apiUrl, setApiUrl] = useState(
-    import.meta.env['VITE_API_URL'] as string ?? 'http://localhost:3001/api/v1',
-  );
+  const { anthropicApiKey, setAnthropicApiKey } = useStore();
+  const [keyInput, setKeyInput] = useState(anthropicApiKey ?? '');
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    setAnthropicApiKey(keyInput.trim() || null);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
 
   return (
     <div className={`${styles.container} scrollable`}>
       <h2 className={styles.title}>Settings</h2>
 
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Account</h3>
-        <div className={styles.userCard}>
-          <div className={styles.avatar}>{user?.email?.[0]?.toUpperCase() ?? 'U'}</div>
-          <div className={styles.userInfo}>
-            <span className={styles.userName}>{user?.name ?? user?.email}</span>
-            <span className={styles.userEmail}>{user?.email}</span>
-            <span className={styles.userRole}>{user?.role} Plan</span>
-          </div>
-        </div>
-        <button className={styles.logoutBtn} onClick={logout}>
-          Sign Out
-        </button>
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>API Configuration</h3>
+        <h3 className={styles.sectionTitle}>AI Configuration</h3>
         <div className={styles.field}>
-          <label>API Server URL</label>
-          <input
-            type="text"
-            value={apiUrl}
-            onChange={(e) => setApiUrl(e.target.value)}
-            placeholder="http://localhost:3001/api/v1"
-          />
-          <span className={styles.fieldHint}>Change this to point to your ShortForge API server</span>
+          <label>Anthropic API Key</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="sk-ant-..."
+              style={{ flex: 1 }}
+            />
+            <button
+              onClick={() => setShowKey((v) => !v)}
+              style={{ padding: '0 10px', background: 'var(--sf-surface-2)', border: '1px solid var(--sf-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--sf-text-2)' }}
+            >
+              {showKey ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <span className={styles.fieldHint}>
+            Get your key at console.anthropic.com — used for local AI analysis, never sent to our servers.
+          </span>
         </div>
+        <button
+          className={styles.logoutBtn}
+          style={{ background: saved ? 'var(--sf-success)' : undefined, marginTop: 8 }}
+          onClick={handleSave}
+        >
+          {saved ? 'Saved!' : 'Save API Key'}
+        </button>
       </div>
 
       <div className={styles.section}>
@@ -71,9 +80,6 @@ export function Settings({ onNavigate: _ }: SettingsProps) {
           </a>
           <a href="https://shortforge.ai/support" target="_blank" rel="noreferrer" className={styles.link}>
             Contact Support
-          </a>
-          <a href="https://shortforge.ai/changelog" target="_blank" rel="noreferrer" className={styles.link}>
-            Changelog
           </a>
         </div>
       </div>

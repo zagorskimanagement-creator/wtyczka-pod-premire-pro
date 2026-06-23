@@ -37,7 +37,7 @@ export function Editor({ onNavigate }: EditorProps) {
 
   useEffect(() => {
     if (activeProjectId && !currentProject) {
-      void loadProject(activeProjectId);
+      void loadProject(activeProjectId).catch(() => {});
     }
   }, [activeProjectId, currentProject, loadProject]);
 
@@ -112,6 +112,15 @@ export function Editor({ onNavigate }: EditorProps) {
               <div className="progress-bar-fill" style={{ width: `${projectStatus.progress}%` }} />
             </div>
           </div>
+        </div>
+      )}
+
+      {projectStatus?.status === 'failed' && (
+        <div className={styles.processingBanner} style={{ background: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.3)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <strong style={{ color: '#ef4444' }}>{projectStatus.message}</strong>
         </div>
       )}
 

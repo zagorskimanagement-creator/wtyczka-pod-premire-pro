@@ -64,10 +64,12 @@ export interface AppState {
   currentProject: Project | null;
   activeExports: Export[];
   processingStatus: Record<string, { status: string; progress: number; message: string }>;
+  anthropicApiKey: string | null;
 
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  setAnthropicApiKey: (key: string | null) => void;
   setActiveProject: (projectId: string | null) => void;
   setActiveClip: (clipId: string | null) => void;
   loadProjects: () => Promise<void>;
@@ -123,6 +125,7 @@ export const useStore = create<AppState>()(
       currentProject: null,
       activeExports: [],
       processingStatus: {},
+      anthropicApiKey: null,
 
       initialize: async () => {
         const { token } = get();
@@ -153,6 +156,10 @@ export const useStore = create<AppState>()(
         set({ token: null, user: null, activeProjectId: null, currentProject: null });
       },
 
+      setAnthropicApiKey: (key) => {
+        set({ anthropicApiKey: key });
+      },
+
       setActiveProject: (projectId) => {
         set({ activeProjectId: projectId });
         if (projectId) {
@@ -175,6 +182,11 @@ export const useStore = create<AppState>()(
       },
 
       loadProject: async (projectId) => {
+        const local = get().projects.find((p) => p.id === projectId);
+        if (local) {
+          set({ currentProject: local });
+          return local;
+        }
         const response = await apiClient.get<{ project: Project }>(`/project/${projectId}`);
         set({ currentProject: response.project });
         return response.project;
@@ -214,61 +226,160 @@ export const useStore = create<AppState>()(
       },
 
       triggerAnalysis: async (projectId, options) => {
-        get().updateProcessingStatus(projectId, 'analyzing', 0, 'Starting analysis...');
+        const { anthropicApiKey, currentProject } = get();
 
-        await apiClient.post('/analyze', {
-          projectId,
-          targetDuration: options.targetDuration,
-          targetPlatform: options.platform,
-          captionStyle: options.captionStyle,
-          removeFillers: options.removeFillers,
-          removeSilence: options.removeSilence,
-          removeRepetitions: options.removeRepetitions,
-          detectHooks: true,
-          detectEmotions: true,
-          generateTitle: true,
-          generateDescription: true,
-          generateHashtags: true,
-        });
+        if (!anthropicApiKey) {
+          get().updateProcessingStatus(projectId, 'failed', 0, 'No API key — add your Anthropic API key in Settings.');
+          return;
+        }
 
-        const pollStatus = async () => {
-          try {
-            const status = await apiClient.get<{ projectStatus: string; videos: Array<{ status: string }> }>(
-              `/upload/${projectId}/status`,
-            );
+        get().updateProcessingStatus(projectId, 'analyzing', 10, 'Connecting to Claude AI...');
 
-            if (status.projectStatus === 'ANALYZED' || status.projectStatus === 'COMPLETED') {
-              get().updateProcessingStatus(projectId, 'completed', 100, 'Analysis complete!');
-              await get().loadProject(projectId);
-              return;
-            }
+        const durationMs = (currentProject?.videos[0]?.durationSeconds ?? 60) * 1000;
+        const targetMs = parseInt(options.targetDuration) * 1000;
+        const startGuess = Math.round(durationMs * 0.1);
 
-            if (status.projectStatus === 'FAILED') {
-              get().updateProcessingStatus(projectId, 'failed', 0, 'Analysis failed');
-              return;
-            }
+        const prompt = `You are a professional video editor specializing in viral short-form content.
+Generate an edit plan for this video clip.
 
-            get().updateProcessingStatus(projectId, 'analyzing', 50, 'AI analyzing content...');
-            setTimeout(() => { void pollStatus(); }, 5000);
-          } catch {
-            get().updateProcessingStatus(projectId, 'failed', 0, 'Connection error');
+Video:
+- Name: ${currentProject?.name ?? 'Unknown'}
+- Total duration: ${Math.round(durationMs / 1000)}s
+- Target platform: ${options.platform.replace('_', ' ')}
+- Target clip duration: ${options.targetDuration}s
+- Caption style: ${options.captionStyle}
+- Remove filler words: ${options.removeFillers}
+- Remove silences: ${options.removeSilence}
+
+Pick the single most engaging ${options.targetDuration}s window from the video.
+Return ONLY valid JSON (no markdown fences, no explanation):
+{
+  "title": "viral title here",
+  "description": "one line description",
+  "viralScore": 82,
+  "hookScore": 75,
+  "startMs": ${startGuess},
+  "endMs": ${startGuess + targetMs},
+  "cuts": [
+    {"startMs": 0, "endMs": ${startGuess}, "type": "remove"},
+    {"startMs": ${startGuess}, "endMs": ${startGuess + targetMs}, "type": "keep"}
+  ],
+  "zooms": [
+    {"startMs": ${Math.round(targetMs * 0.1)}, "endMs": ${Math.round(targetMs * 0.3)}, "scale": 1.15, "posX": 0.5, "posY": 0.5, "easing": "ease-in-out"}
+  ],
+  "captions": [
+    {"text": "Opening hook", "startMs": 0, "endMs": 2500, "positionY": 0.85, "fontSize": 72, "colorHex": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 3, "animationType": "pop"},
+    {"text": "Continue here", "startMs": 2500, "endMs": 5000, "positionY": 0.85, "fontSize": 64, "colorHex": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 3, "animationType": "fade"}
+  ],
+  "hashtags": ["#viral", "#fyp", "#trending"]
+}`;
+
+        try {
+          get().updateProcessingStatus(projectId, 'analyzing', 30, 'Asking Claude AI...');
+
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': anthropicApiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+              'anthropic-dangerous-direct-browser-access': 'true',
+            },
+            body: JSON.stringify({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 2048,
+              messages: [{ role: 'user', content: prompt }],
+            }),
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Claude API ${res.status}: ${errText}`);
           }
-        };
 
-        setTimeout(() => { void pollStatus(); }, 3000);
+          get().updateProcessingStatus(projectId, 'analyzing', 75, 'Processing results...');
+
+          const data = await res.json() as { content: Array<{ type: string; text: string }> };
+          const raw = data.content.find((c) => c.type === 'text')?.text ?? '{}';
+          const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+          const plan = JSON.parse(jsonStr) as {
+            title?: string; description?: string; viralScore?: number; hookScore?: number;
+            startMs?: number; endMs?: number; cuts?: unknown[]; zooms?: unknown[];
+            captions?: unknown[]; hashtags?: string[];
+          };
+
+          const clip: Clip = {
+            id: `clip-${Date.now()}`,
+            title: plan.title ?? `${currentProject?.name ?? 'Clip'} — Best Moment`,
+            description: plan.description ?? null,
+            hashtags: plan.hashtags ?? [],
+            platform: options.platform,
+            startMs: plan.startMs ?? 0,
+            endMs: plan.endMs ?? targetMs,
+            durationMs: (plan.endMs ?? targetMs) - (plan.startMs ?? 0),
+            viralScore: plan.viralScore ?? null,
+            hookScore: plan.hookScore ?? null,
+            retentionScore: null,
+            captionStyle: options.captionStyle,
+          };
+
+          const editPlan: EditPlan = {
+            cutsJson: plan.cuts ?? [],
+            zoomsJson: plan.zooms ?? [],
+            captionsJson: plan.captions ?? [],
+            transitionsJson: [],
+            effectsJson: [],
+            titleSuggestion: plan.title ?? null,
+            descriptionSuggestion: plan.description ?? null,
+            hashtagsJson: plan.hashtags ?? [],
+          };
+
+          set((state) => ({
+            projects: state.projects.map((p) =>
+              p.id === projectId ? { ...p, status: 'ANALYZED', clips: [clip], editPlan } : p,
+            ),
+            currentProject: state.currentProject?.id === projectId
+              ? { ...state.currentProject, status: 'ANALYZED', clips: [clip], editPlan }
+              : state.currentProject,
+          }));
+
+          get().updateProcessingStatus(projectId, 'completed', 100, 'Analysis complete!');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Analysis failed';
+          get().updateProcessingStatus(projectId, 'failed', 0, msg);
+        }
       },
 
-      applyEditPlan: async (projectId, clipIndex) => {
+      applyEditPlan: async (_projectId, clipIndex) => {
         const project = get().currentProject;
         if (!project?.editPlan) throw new Error('No edit plan available');
 
-        const response = await apiClient.post<ApplyEditResult>('/apply-edit', {
-          projectId,
-          editPlanId: project.id,
-          clipIndex,
-        });
+        const clip = project.clips?.[clipIndex ?? 0];
+        const video = project.videos[0];
 
-        return response;
+        return {
+          editPlan: {
+            cuts: (project.editPlan.cutsJson as unknown[]) ?? [],
+            zooms: (project.editPlan.zoomsJson as unknown[]) ?? [],
+            captions: (project.editPlan.captionsJson as unknown[]) ?? [],
+            transitions: (project.editPlan.transitionsJson as unknown[]) ?? [],
+            effects: (project.editPlan.effectsJson as unknown[]) ?? [],
+          },
+          clip: {
+            startMs: clip?.startMs ?? 0,
+            endMs: clip?.endMs ?? 0,
+            title: clip?.title ?? null,
+            captions: (project.editPlan.captionsJson as unknown[]) ?? [],
+          },
+          video: {
+            storagePath: video?.storageUrl ?? '',
+            storageUrl: video?.storageUrl,
+            durationSeconds: video?.durationSeconds,
+          },
+          titleSuggestion: project.editPlan.titleSuggestion,
+          descriptionSuggestion: project.editPlan.descriptionSuggestion,
+          hashtags: project.editPlan.hashtagsJson,
+        };
       },
 
       updateProcessingStatus: (projectId, status, progress, message) => {
@@ -282,7 +393,12 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'shortforge-store',
-      partialize: (state) => ({ token: state.token, user: state.user }),
+      partialize: (state) => ({
+        token: state.token,
+        user: state.user,
+        anthropicApiKey: state.anthropicApiKey,
+        projects: state.projects,
+      }),
     },
   ),
 );
