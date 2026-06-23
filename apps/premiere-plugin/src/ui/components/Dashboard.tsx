@@ -14,7 +14,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void loadProjects();
+    void loadProjects().catch(() => {});
   }, [loadProjects]);
 
   const handleFileUpload = async (file: File) => {

@@ -3,7 +3,6 @@ import { Dashboard } from './ui/components/Dashboard.js';
 import { Editor } from './ui/components/Editor.js';
 import { ExportPanel } from './ui/components/ExportPanel.js';
 import { Settings } from './ui/components/Settings.js';
-import { LoginScreen } from './ui/components/LoginScreen.js';
 import { useStore } from './ui/store/index.js';
 import styles from './App.module.css';
 
@@ -11,7 +10,7 @@ type Screen = 'dashboard' | 'editor' | 'export' | 'settings';
 
 export default function App() {
   const [activeScreen, setActiveScreen] = useState<Screen>('dashboard');
-  const { token, isInitialized, initialize } = useStore();
+  const { isInitialized, initialize } = useStore();
 
   useEffect(() => {
     void initialize();
@@ -24,10 +23,6 @@ export default function App() {
         <span>Loading ShortForge AI...</span>
       </div>
     );
-  }
-
-  if (!token) {
-    return <LoginScreen />;
   }
 
   return (
