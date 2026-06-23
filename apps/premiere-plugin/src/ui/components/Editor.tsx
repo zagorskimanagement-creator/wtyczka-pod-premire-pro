@@ -11,7 +11,20 @@ const PLATFORMS = ['TIKTOK', 'INSTAGRAM_REELS', 'YOUTUBE_SHORTS'] as const;
 const CAPTION_STYLES = ['TIKTOK', 'HORMOZI', 'GADZHI', 'MRBEAST'] as const;
 const DURATIONS = ['15', '30', '45', '60'] as const;
 const FORMATS = ['9:16', '16:9', '1:1'] as const;
-const TRANSITIONS = ['cut', 'dissolve', 'zoom', 'flash', 'dip'] as const;
+const TRANSITIONS = ['cut', 'zoomBlur', 'spin', 'slide', 'shake', 'glitch', 'dissolve', 'zoom', 'flash', 'dip'] as const;
+
+const TRANSITION_LABELS: Record<typeof TRANSITIONS[number], string> = {
+  cut:      'Cut',
+  zoomBlur: 'Zoom Blur',
+  spin:     'Spin',
+  slide:    'Slide',
+  shake:    'Shake',
+  glitch:   'Glitch',
+  dissolve: 'Dissolve',
+  zoom:     'Zoom Punch',
+  flash:    'Flash',
+  dip:      'Dip Black',
+};
 
 export function Editor({ onNavigate }: EditorProps) {
   const {
@@ -27,7 +40,7 @@ export function Editor({ onNavigate }: EditorProps) {
   const [captionStyle, setCaptionStyle] = useState<typeof CAPTION_STYLES[number]>('TIKTOK');
   const [duration, setDuration] = useState<typeof DURATIONS[number]>('60');
   const [format, setFormat] = useState<typeof FORMATS[number]>('9:16');
-  const [transitionType, setTransitionType] = useState<typeof TRANSITIONS[number]>('dissolve');
+  const [transitionType, setTransitionType] = useState<typeof TRANSITIONS[number]>('zoomBlur');
   const [removeFillers, setRemoveFillers] = useState(true);
   const [removeSilence, setRemoveSilence] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
@@ -219,7 +232,7 @@ export function Editor({ onNavigate }: EditorProps) {
                 className={`${styles.chip} ${transitionType === t ? styles.chipActive : ''}`}
                 onClick={() => setTransitionType(t)}
               >
-                {t === 'cut' ? 'Cut' : t === 'dissolve' ? 'Dissolve' : t === 'zoom' ? 'Zoom Punch' : t === 'flash' ? 'Flash' : 'Dip Black'}
+                {TRANSITION_LABELS[t]}
               </button>
             ))}
           </div>

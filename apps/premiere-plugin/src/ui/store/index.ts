@@ -44,7 +44,7 @@ export interface EditPlan {
   descriptionSuggestion: string | null;
   hashtagsJson: unknown;
   format: '9:16' | '16:9' | '1:1';
-  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
+  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
 }
 
 export interface Export {
@@ -92,7 +92,7 @@ export interface AnalysisOptions {
   removeSilence: boolean;
   removeRepetitions: boolean;
   format: '9:16' | '16:9' | '1:1';
-  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
+  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
 }
 
 export interface ApplyEditResult {
@@ -103,7 +103,7 @@ export interface ApplyEditResult {
     transitions: unknown[];
     effects: unknown[];
     format: '9:16' | '16:9' | '1:1';
-    transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
+    transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
   };
   clip: {
     startMs: number;

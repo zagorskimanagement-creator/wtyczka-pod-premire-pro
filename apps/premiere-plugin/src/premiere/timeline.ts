@@ -43,7 +43,7 @@ export interface EditPlanInstructions {
   captions: CaptionInstruction[];
   effects: EffectInstruction[];
   format?: '9:16' | '16:9' | '1:1';
-  transitionType?: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
+  transitionType?: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
   transitionFrames?: number;
 }
 

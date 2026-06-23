@@ -275,6 +275,229 @@ function addZoomPunchTransitions(durationFrames) {
   }
 }
 
+// ─── Custom keyframe-based transitions ───────────────────────────────────────
+// These work without any Adobe transition API — purely Motion/Opacity keyframes.
+
+function _motionOf(clip) {
+  var m = clip.getComponentByDisplayName('Motion');
+  if (!m) return null;
+  return {
+    scale: m.properties.getParamForDisplayName('Scale'),
+    pos:   m.properties.getParamForDisplayName('Position'),
+    rot:   m.properties.getParamForDisplayName('Rotation'),
+  };
+}
+
+function _opacityOf(clip) {
+  try {
+    var fx = clip.getComponentByDisplayName('Opacity');
+    if (!fx) return null;
+    return fx.properties.getParamForDisplayName('Opacity');
+  } catch (e) { return null; }
+}
+
+function _kf(sec) {
+  return { seconds: sec, ticks: msToTicks(sec * 1000) };
+}
+
+// Zoom Blur — extreme scale explosion + opacity fade (most viral TikTok style)
+function addZoomBlurTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var fps   = seq.timebase;
+    var dur   = (durationFrames || 12) / fps;
+
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var clip = track.clips[i];
+      var m    = _motionOf(clip);
+      var op   = _opacityOf(clip);
+      if (!m || !m.scale) continue;
+
+      var clipLen = clip.end.seconds - clip.start.seconds;
+      if (clipLen < dur * 3) continue;
+
+      // Zoom OUT + fade at end of clip (exit)
+      if (i < track.clips.numItems - 1) {
+        var eA = _kf(clip.end.seconds - dur);
+        var eB = _kf(clip.end.seconds);
+        m.scale.addKey(eA); m.scale.addKey(eB);
+        m.scale.setValueAtTime(eA, 100); m.scale.setValueAtTime(eB, 320);
+        if (op) { op.addKey(eA); op.addKey(eB); op.setValueAtTime(eA, 100); op.setValueAtTime(eB, 0); }
+      }
+
+      // Zoom IN + fade at start of clip (enter)
+      if (i > 0) {
+        var sA = _kf(clip.start.seconds);
+        var sB = _kf(clip.start.seconds + dur);
+        m.scale.addKey(sA); m.scale.addKey(sB);
+        m.scale.setValueAtTime(sA, 320); m.scale.setValueAtTime(sB, 100);
+        if (op) { op.addKey(sA); op.addKey(sB); op.setValueAtTime(sA, 0); op.setValueAtTime(sB, 100); }
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// Spin — rotation + scale squeeze (door/spin wipe)
+function addSpinTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var fps   = seq.timebase;
+    var dur   = (durationFrames || 12) / fps;
+
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var clip = track.clips[i];
+      var m    = _motionOf(clip);
+      if (!m || !m.scale || !m.rot) continue;
+
+      var clipLen = clip.end.seconds - clip.start.seconds;
+      if (clipLen < dur * 3) continue;
+
+      // Exit: rotate 0→90°, squeeze scale 100→0
+      if (i < track.clips.numItems - 1) {
+        var eA = _kf(clip.end.seconds - dur);
+        var eB = _kf(clip.end.seconds);
+        m.rot.addKey(eA); m.rot.addKey(eB);
+        m.rot.setValueAtTime(eA, 0); m.rot.setValueAtTime(eB, 90);
+        m.scale.addKey(eA); m.scale.addKey(eB);
+        m.scale.setValueAtTime(eA, 100); m.scale.setValueAtTime(eB, 10);
+      }
+
+      // Enter: rotate -90→0°, scale 0→100
+      if (i > 0) {
+        var sA = _kf(clip.start.seconds);
+        var sB = _kf(clip.start.seconds + dur);
+        m.rot.addKey(sA); m.rot.addKey(sB);
+        m.rot.setValueAtTime(sA, -90); m.rot.setValueAtTime(sB, 0);
+        m.scale.addKey(sA); m.scale.addKey(sB);
+        m.scale.setValueAtTime(sA, 10); m.scale.setValueAtTime(sB, 100);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// Slide — horizontal position push (clip A slides out left, clip B enters from right)
+function addSlideTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var fps   = seq.timebase;
+    var dur   = (durationFrames || 8) / fps;
+    var w     = seq.frameSizeHorizontal || 1920;
+    var h     = seq.frameSizeVertical   || 1080;
+    var cx    = w / 2;
+    var cy    = h / 2;
+
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var clip = track.clips[i];
+      var m    = _motionOf(clip);
+      if (!m || !m.pos) continue;
+
+      var clipLen = clip.end.seconds - clip.start.seconds;
+      if (clipLen < dur * 3) continue;
+
+      // Exit: slide left off screen
+      if (i < track.clips.numItems - 1) {
+        var eA = _kf(clip.end.seconds - dur);
+        var eB = _kf(clip.end.seconds);
+        m.pos.addKey(eA); m.pos.addKey(eB);
+        try { m.pos.setValueAtTime(eA, [cx, cy]); m.pos.setValueAtTime(eB, [-cx, cy]); } catch(pe) {}
+      }
+
+      // Enter: slide in from right
+      if (i > 0) {
+        var sA = _kf(clip.start.seconds);
+        var sB = _kf(clip.start.seconds + dur);
+        m.pos.addKey(sA); m.pos.addKey(sB);
+        try { m.pos.setValueAtTime(sA, [w + cx, cy]); m.pos.setValueAtTime(sB, [cx, cy]); } catch(pe) {}
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// Shake — rapid camera shake at every cut (position oscillation)
+function addShakeTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var fps   = seq.timebase;
+    var dur   = (durationFrames || 10) / fps;
+    var cx    = (seq.frameSizeHorizontal || 1920) / 2;
+    var cy    = (seq.frameSizeVertical   || 1080) / 2;
+    var amp   = 38; // pixel shake amplitude
+
+    for (var i = 1; i < track.clips.numItems; i++) {
+      var clip = track.clips[i];
+      var m    = _motionOf(clip);
+      if (!m || !m.pos) continue;
+
+      // 8 oscillating keyframes that decay to zero
+      var steps  = 8;
+      var decays = [1, -0.8, 0.6, -0.45, 0.3, -0.2, 0.1, 0];
+      for (var j = 0; j < steps; j++) {
+        var tSec = clip.start.seconds + (dur / steps) * j;
+        var kf   = _kf(tSec);
+        m.pos.addKey(kf);
+        try { m.pos.setValueAtTime(kf, [cx + amp * decays[j], cy]); } catch(pe) {}
+      }
+      // Settle: last keyframe at center
+      var kfEnd = _kf(clip.start.seconds + dur);
+      m.pos.addKey(kfEnd);
+      try { m.pos.setValueAtTime(kfEnd, [cx, cy]); } catch(pe) {}
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// Glitch — rapid scale + position micro-jumps for a digital glitch effect
+function addGlitchTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var fps   = seq.timebase;
+    var dur   = (durationFrames || 8) / fps;
+    var cx    = (seq.frameSizeHorizontal || 1920) / 2;
+    var cy    = (seq.frameSizeVertical   || 1080) / 2;
+
+    var glitchScales = [100, 108, 96, 112, 98, 104, 100];
+    var glitchOffX   = [  0,  18, -12,  22, -8,   6,   0];
+
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var clip = track.clips[i];
+      var m    = _motionOf(clip);
+      if (!m || !m.scale) continue;
+
+      var clipLen = clip.end.seconds - clip.start.seconds;
+      if (clipLen < dur * 2) continue;
+
+      // Glitch on exit of each clip
+      if (i < track.clips.numItems - 1) {
+        var step = dur / glitchScales.length;
+        for (var j = 0; j < glitchScales.length; j++) {
+          var tSec = (clip.end.seconds - dur) + step * j;
+          var kf   = _kf(tSec);
+          m.scale.addKey(kf);
+          m.scale.setValueAtTime(kf, glitchScales[j]);
+          if (m.pos) {
+            m.pos.addKey(kf);
+            try { m.pos.setValueAtTime(kf, [cx + glitchOffX[j], cy]); } catch(pe) {}
+          }
+        }
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
 // Main transition dispatcher
 function applyTransitions(transitionType, durationFrames) {
   var frames = durationFrames || 15;
@@ -283,6 +506,12 @@ function applyTransitions(transitionType, durationFrames) {
     case 'flash':     return addNamedTransitions('Dip to White',   frames);
     case 'dip':       return addNamedTransitions('Dip to Black',   frames);
     case 'zoom':      return addZoomPunchTransitions(Math.round(frames * 0.7));
+    // Custom keyframe-based transitions
+    case 'zoomBlur':  return addZoomBlurTransitions(frames);
+    case 'spin':      return addSpinTransitions(frames);
+    case 'slide':     return addSlideTransitions(Math.round(frames * 0.6));
+    case 'shake':     return addShakeTransitions(Math.round(frames * 0.8));
+    case 'glitch':    return addGlitchTransitions(Math.round(frames * 0.5));
     default:          return JSON.stringify({ success: true }); // 'cut' = no transition
   }
 }
