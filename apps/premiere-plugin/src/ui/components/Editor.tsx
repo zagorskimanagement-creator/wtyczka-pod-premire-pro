@@ -63,12 +63,26 @@ export function Editor({ onNavigate }: EditorProps) {
       const result = await applyEditPlan(activeProjectId, selectedClipIndex);
 
       const tm = new TimelineManager();
-      await tm.ensureSequenceExists(currentProject?.name ?? 'ShortForge Clip');
+      const clip = currentProject?.clips?.[selectedClipIndex];
+      await tm.setupSequenceWithClip(
+        currentProject?.name ?? 'ShortForge Clip',
+        result.clip.startMs,
+        result.clip.endMs,
+      );
+      // Remap zoom/caption times to be relative to clip start
+      const offset = clip?.startMs ?? 0;
+      const remap = (ms: number) => Math.max(0, ms - offset);
       await tm.applyEditPlan({
-        cuts: (result.editPlan.cuts as CutInstruction[]) ?? [],
-        zooms: (result.editPlan.zooms as ZoomInstruction[]) ?? [],
-        captions: (result.editPlan.captions as CaptionInstruction[]) ?? [],
-        effects: (result.editPlan.effects as EffectInstruction[]) ?? [],
+        cuts: [],
+        zooms: (result.editPlan.zooms as ZoomInstruction[]).map((z) => ({
+          ...z, startMs: remap(z.startMs), endMs: remap(z.endMs),
+        })),
+        captions: (result.editPlan.captions as CaptionInstruction[]).map((c) => ({
+          ...c, startMs: remap(c.startMs), endMs: remap(c.endMs),
+        })),
+        effects: (result.editPlan.effects as EffectInstruction[]).map((e) => ({
+          ...e, startMs: remap(e.startMs), endMs: remap(e.endMs),
+        })),
       });
 
       setApplySuccess(true);
@@ -302,7 +316,7 @@ function formatMs(ms: number): string {
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
-interface CutInstruction { startMs: number; endMs: number; type: 'keep' | 'remove'; }
+// CutInstruction unused — cuts handled via in/out points at sequence creation
 interface ZoomInstruction { startMs: number; endMs: number; scale: number; posX: number; posY: number; easing: string; }
 interface CaptionInstruction { text: string; startMs: number; endMs: number; positionY: number; fontSize: number; colorHex: string; strokeColor: string; strokeWidth: number; }
 interface EffectInstruction { startMs: number; endMs: number; type: string; params: Record<string, number | string>; }

@@ -46,12 +46,22 @@ export function Editor({ onNavigate }) {
         try {
             const result = await applyEditPlan(activeProjectId, selectedClipIndex);
             const tm = new TimelineManager();
-            await tm.ensureSequenceExists(currentProject?.name ?? 'ShortForge Clip');
+            const clip = currentProject?.clips?.[selectedClipIndex];
+            await tm.setupSequenceWithClip(currentProject?.name ?? 'ShortForge Clip', result.clip.startMs, result.clip.endMs);
+            // Remap zoom/caption times to be relative to clip start
+            const offset = clip?.startMs ?? 0;
+            const remap = (ms) => Math.max(0, ms - offset);
             await tm.applyEditPlan({
-                cuts: result.editPlan.cuts ?? [],
-                zooms: result.editPlan.zooms ?? [],
-                captions: result.editPlan.captions ?? [],
-                effects: result.editPlan.effects ?? [],
+                cuts: [],
+                zooms: result.editPlan.zooms.map((z) => ({
+                    ...z, startMs: remap(z.startMs), endMs: remap(z.endMs),
+                })),
+                captions: result.editPlan.captions.map((c) => ({
+                    ...c, startMs: remap(c.startMs), endMs: remap(c.endMs),
+                })),
+                effects: result.editPlan.effects.map((e) => ({
+                    ...e, startMs: remap(e.startMs), endMs: remap(e.endMs),
+                })),
             });
             setApplySuccess(true);
             setTimeout(() => setApplySuccess(false), 3000);

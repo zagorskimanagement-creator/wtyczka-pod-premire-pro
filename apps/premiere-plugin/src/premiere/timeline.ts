@@ -63,20 +63,14 @@ export class TimelineManager {
     await evalScript(`createSequence(${JSON.stringify(name)})`);
   }
 
-  async ensureSequenceExists(clipName: string): Promise<void> {
-    const info = await this.getSequenceInfo();
-    if (info) return;
-    const result = await evalScript(`createSequenceFromClip(${JSON.stringify(clipName)})`);
+  async setupSequenceWithClip(clipName: string, startMs: number, endMs: number): Promise<void> {
+    const result = await evalScript(`setupSequenceWithClip(${JSON.stringify(clipName)}, ${startMs}, ${endMs})`);
     const data = JSON.parse(result) as { error?: string };
-    if (data.error) throw new Error(`Could not create sequence: ${data.error}`);
+    if (data.error) throw new Error(`Could not set up sequence: ${data.error}`);
   }
 
   async applyEditPlan(instructions: EditPlanInstructions): Promise<void> {
-    for (const cut of instructions.cuts) {
-      if (cut.type === 'remove') {
-        await evalScript(`removeCut(${cut.startMs}, ${cut.endMs})`);
-      }
-    }
+    // Cuts are handled via in/out points at sequence creation — skip removeCut
     for (const zoom of instructions.zooms) {
       await evalScript(`applyZoom(${zoom.startMs}, ${zoom.endMs}, ${zoom.scale})`);
     }

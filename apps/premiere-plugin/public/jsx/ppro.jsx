@@ -41,12 +41,11 @@ function createSequence(name) {
   }
 }
 
-function createSequenceFromClip(clipName) {
+function setupSequenceWithClip(clipName, startMs, endMs) {
   try {
     var root = app.project.rootItem;
     var targetItem = null;
 
-    // Search project items for the clip
     for (var i = 0; i < root.children.numItems; i++) {
       var item = root.children[i];
       if (item.name.indexOf(clipName) !== -1 || clipName.indexOf(item.name) !== -1) {
@@ -55,7 +54,7 @@ function createSequenceFromClip(clipName) {
       }
     }
 
-    // Fall back to first video item if name not matched
+    // Fall back to first clip in project
     if (!targetItem) {
       for (var j = 0; j < root.children.numItems; j++) {
         var child = root.children[j];
@@ -68,13 +67,23 @@ function createSequenceFromClip(clipName) {
 
     if (!targetItem) return JSON.stringify({ error: 'No clip found in project' });
 
-    // Create sequence from clip (matches clip settings automatically)
-    app.project.createNewSequenceFromClips(clipName, [targetItem], app.project.rootItem);
-
+    // Create a fresh sequence matching the clip settings
+    app.project.createNewSequenceFromClips(clipName + ' - ShortForge', [targetItem], app.project.rootItem);
     var seq = app.project.activeSequence;
-    if (!seq) return JSON.stringify({ error: 'Sequence created but not active' });
+    if (!seq) return JSON.stringify({ error: 'Could not create sequence' });
 
-    return JSON.stringify({ success: true, name: seq.name });
+    // Remove any clips auto-added by createNewSequenceFromClips
+    var vTrack = seq.videoTracks[0];
+    while (vTrack && vTrack.clips.numItems > 0) {
+      vTrack.clips[0].remove(false, false);
+    }
+
+    // Insert only the AI-selected portion using source in/out points
+    var inSec = startMs / 1000;
+    var outSec = endMs / 1000;
+    seq.videoTracks[0].insertClip(targetItem, 0, inSec, outSec);
+
+    return JSON.stringify({ success: true, name: seq.name, durationMs: Math.round((outSec - inSec) * 1000) });
   } catch (e) {
     return JSON.stringify({ error: e.toString() });
   }
