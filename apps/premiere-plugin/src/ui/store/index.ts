@@ -277,16 +277,14 @@ Return ONLY valid JSON (no markdown fences, no explanation):
         try {
           get().updateProcessingStatus(projectId, 'analyzing', 30, 'Asking Claude AI...');
 
-          const res = await fetch('https://api.anthropic.com/v1/messages', {
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
-              'x-api-key': anthropicApiKey,
-              'anthropic-version': '2023-06-01',
+              'Authorization': `Bearer ${anthropicApiKey}`,
               'content-type': 'application/json',
-              'anthropic-dangerous-direct-browser-access': 'true',
             },
             body: JSON.stringify({
-              model: 'claude-haiku-4-5-20251001',
+              model: 'llama-3.3-70b-versatile',
               max_tokens: 2048,
               messages: [{ role: 'user', content: prompt }],
             }),
@@ -294,13 +292,13 @@ Return ONLY valid JSON (no markdown fences, no explanation):
 
           if (!res.ok) {
             const errText = await res.text();
-            throw new Error(`Claude API ${res.status}: ${errText}`);
+            throw new Error(`Groq API ${res.status}: ${errText}`);
           }
 
           get().updateProcessingStatus(projectId, 'analyzing', 75, 'Processing results...');
 
-          const data = await res.json() as { content: Array<{ type: string; text: string }> };
-          const raw = data.content.find((c) => c.type === 'text')?.text ?? '{}';
+          const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+          const raw = data.choices[0]?.message.content ?? '{}';
           const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
           const plan = JSON.parse(jsonStr) as {
             title?: string; description?: string; viralScore?: number; hookScore?: number;

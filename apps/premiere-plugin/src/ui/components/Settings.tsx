@@ -25,13 +25,13 @@ export function Settings({ onNavigate: _ }: SettingsProps) {
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>AI Configuration</h3>
         <div className={styles.field}>
-          <label>Anthropic API Key</label>
+          <label>Groq API Key</label>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               type={showKey ? 'text' : 'password'}
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
-              placeholder="sk-ant-..."
+              placeholder="gsk_..."
               style={{ flex: 1 }}
             />
             <button
@@ -42,7 +42,7 @@ export function Settings({ onNavigate: _ }: SettingsProps) {
             </button>
           </div>
           <span className={styles.fieldHint}>
-            Get your key at console.anthropic.com — used for local AI analysis, never sent to our servers.
+            Get your free key at console.groq.com — used for local AI analysis, never sent to our servers.
           </span>
         </div>
         <button
