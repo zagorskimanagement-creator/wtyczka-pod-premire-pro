@@ -43,7 +43,7 @@ export interface EditPlanInstructions {
   captions: CaptionInstruction[];
   effects: EffectInstruction[];
   format?: '9:16' | '16:9' | '1:1';
-  transitionType?: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
+  transitionType?: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'glitch' | 'filmBurn' | 'breathe';
   transitionFrames?: number;
 }
 
@@ -115,7 +115,13 @@ export class TimelineManager {
 
     const transitionType = instructions.transitionType ?? 'cut';
     const frames = instructions.transitionFrames ?? 15;
-    await evalScript(`applyTransitions(${JSON.stringify(transitionType)}, ${frames})`);
+    const transitionResult = await evalScript(`applyTransitions(${JSON.stringify(transitionType)}, ${frames})`);
+    try {
+      const td = JSON.parse(transitionResult) as { keysSet?: number; keysFailed?: number; error?: string };
+      if (td.error) console.warn('[ShortForge] Transition error:', td.error);
+      else if (td.keysSet === 0 && transitionType !== 'cut') console.warn('[ShortForge] Transitions: 0 keyframes set, keysFailed=', td.keysFailed);
+      else console.log('[ShortForge] Transitions:', td.keysSet, 'keys set,', td.keysFailed, 'failed');
+    } catch { /* ignore parse errors */ }
 
     if (instructions.format && instructions.format !== '16:9') {
       await this.reframeSequence(instructions.format);

@@ -11,18 +11,18 @@ const PLATFORMS = ['TIKTOK', 'INSTAGRAM_REELS', 'YOUTUBE_SHORTS'] as const;
 const CAPTION_STYLES = ['TIKTOK', 'HORMOZI', 'GADZHI', 'MRBEAST'] as const;
 const DURATIONS = ['15', '30', '45', '60'] as const;
 const FORMATS = ['9:16', '16:9', '1:1'] as const;
-const TRANSITIONS = ['cut', 'zoomBlur', 'spin', 'slide', 'shake', 'glitch', 'dissolve', 'zoom', 'flash', 'dip'] as const;
+const TRANSITIONS = ['cut', 'zoomBlur', 'spin', 'glitch', 'filmBurn', 'breathe', 'dissolve', 'flash', 'zoom', 'dip'] as const;
 
 const TRANSITION_LABELS: Record<typeof TRANSITIONS[number], string> = {
   cut:      'Cut',
   zoomBlur: 'Zoom Blur',
   spin:     'Spin',
-  slide:    'Slide',
-  shake:    'Shake',
   glitch:   'Glitch',
+  filmBurn: 'Film Burn',
+  breathe:  'Breathe',
   dissolve: 'Dissolve',
-  zoom:     'Zoom Punch',
   flash:    'Flash',
+  zoom:     'Zoom Punch',
   dip:      'Dip Black',
 };
 

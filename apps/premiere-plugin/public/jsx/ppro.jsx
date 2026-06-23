@@ -155,7 +155,8 @@ function reframeSequence(targetFormat) {
     if (!seq) return JSON.stringify({ error: 'No active sequence' });
 
     if (targetFormat === '9:16') {
-      // Try Premiere Pro's built-in Auto Reframe (PP 14.0+)
+      // Try Premiere Pro's built-in Auto Reframe (PP 14.0+) — a separate effect
+      // that tracks the subject; coexists fine with Motion-Scale transitions.
       try {
         seq.autoReframeSequence(9, 16, 1, seq.name.replace('ShortForge', 'ShortForge 9x16'));
         return JSON.stringify({ success: true, method: 'autoReframe' });
@@ -163,13 +164,8 @@ function reframeSequence(targetFormat) {
         // Fallback: scale all clips to fill vertical crop (center of frame)
         var track = seq.videoTracks[0];
         for (var i = 0; i < track.clips.numItems; i++) {
-          var clip = track.clips[i];
-          var motion = clip.getComponentByDisplayName('Motion');
-          if (!motion) continue;
-          var scaleParam = motion.properties.getParamForDisplayName('Scale');
-          var posYParam  = motion.properties.getParamForDisplayName('Position');
-          if (scaleParam) scaleParam.setValue(178, true);  // fill 9:16 height
-          if (posYParam)  posYParam.setValue(540, true);   // center vertically
+          var sp = _param(_comp(track.clips[i], ['Motion', 'AE.ADBE Motion']), ['Scale']);
+          if (sp) { try { sp.setValue(178, true); } catch (se) {} }
         }
         return JSON.stringify({ success: true, method: 'manualScale178', note: 'Clips scaled for vertical crop. Export as 1080x1920 for true 9:16.' });
       }
@@ -182,11 +178,8 @@ function reframeSequence(targetFormat) {
       } catch (e2) {
         var track2 = seq.videoTracks[0];
         for (var j = 0; j < track2.clips.numItems; j++) {
-          var clip2 = track2.clips[j];
-          var motion2 = clip2.getComponentByDisplayName('Motion');
-          if (!motion2) continue;
-          var sp = motion2.properties.getParamForDisplayName('Scale');
-          if (sp) sp.setValue(133, true);  // fill square from 16:9
+          var sp2 = _param(_comp(track2.clips[j], ['Motion', 'AE.ADBE Motion']), ['Scale']);
+          if (sp2) { try { sp2.setValue(133, true); } catch (se2) {} }
         }
         return JSON.stringify({ success: true, method: 'manualScale133' });
       }
@@ -200,320 +193,395 @@ function reframeSequence(targetFormat) {
 }
 
 // ─── Transitions ──────────────────────────────────────────────────────────────
+// ALL transitions are keyframe-based (Scale + Rotation + Opacity on Motion/Opacity
+// intrinsic effects). No QE / Adobe transition API needed — that API requires
+// clip "handles" (extra source frames) which we never have after insertClip.
 
-// Add standard named transitions (dissolve, flash, dip) between all clips via QE
-function addNamedTransitions(transitionName, durationFrames) {
+// ── helpers ──
+
+var KF_BEZIER = 2; // Bezier interpolation = smooth, "hand-keyed" feel
+var _kfStat = { set: 0, fail: 0 };
+function _resetKf() { _kfStat = { set: 0, fail: 0 }; }
+
+// IMPORTANT: seq.timebase is TICKS-PER-FRAME, not fps. Real fps must be derived.
+function _fps(seq) {
   try {
-    app.enableQE();
-    var qeSeq = qe.sequence;
-    if (!qeSeq) return JSON.stringify({ error: 'QE not available' });
-
-    var track = qeSeq.videoTrack(0);
-    if (!track || track.numItems < 2) return JSON.stringify({ success: true });
-
-    var frames = durationFrames || 15;
-    for (var i = 1; i < track.numItems; i++) {
-      try {
-        track.clip(i).addTransition(transitionName, 2, frames); // 2 = centered on cut
-      } catch (te) {
-        try {
-          track.clip(i).addTransition(transitionName, 1, frames); // 1 = at start
-        } catch (te2) { /* skip */ }
-      }
-    }
-    return JSON.stringify({ success: true });
-  } catch (e) {
-    return JSON.stringify({ error: e.toString() });
-  }
+    var tb = parseFloat(seq.timebase);
+    if (tb && tb > 0) return TICKS_PER_SECOND / tb;
+  } catch (e) {}
+  return 30;
 }
 
-// Zoom punch: scale 100→125 at end of each clip, 125→100 at start of next
-function addZoomPunchTransitions(durationFrames) {
-  try {
-    var seq = app.project.activeSequence;
-    if (!seq) return JSON.stringify({ error: 'No active sequence' });
-
-    var track = seq.videoTracks[0];
-    var fps   = seq.timebase;
-    var durSec = (durationFrames || 10) / fps;
-
-    for (var i = 0; i < track.clips.numItems; i++) {
-      var clip   = track.clips[i];
-      var motion = clip.getComponentByDisplayName('Motion');
-      if (!motion) continue;
-      var scale = motion.properties.getParamForDisplayName('Scale');
-      if (!scale) continue;
-
-      var clipDurSec = clip.end.seconds - clip.start.seconds;
-      if (clipDurSec < durSec * 2.5) continue;
-
-      // Zoom OUT at end (punch to next clip)
-      if (i < track.clips.numItems - 1) {
-        var t1s = clip.end.seconds - durSec;
-        var t1e = clip.end.seconds;
-        var kStart = { seconds: t1s, ticks: msToTicks(t1s * 1000) };
-        var kEnd   = { seconds: t1e, ticks: msToTicks(t1e * 1000) };
-        scale.addKey(kStart); scale.addKey(kEnd);
-        scale.setValueAtTime(kStart, 100);
-        scale.setValueAtTime(kEnd,   125);
-      }
-
-      // Zoom IN at start (from punch)
-      if (i > 0) {
-        var t2s = clip.start.seconds;
-        var t2e = clip.start.seconds + durSec;
-        var kIn  = { seconds: t2s, ticks: msToTicks(t2s * 1000) };
-        var kOut = { seconds: t2e, ticks: msToTicks(t2e * 1000) };
-        scale.addKey(kIn); scale.addKey(kOut);
-        scale.setValueAtTime(kIn,  125);
-        scale.setValueAtTime(kOut, 100);
-      }
-    }
-    return JSON.stringify({ success: true });
-  } catch (e) {
-    return JSON.stringify({ error: e.toString() });
-  }
-}
-
-// ─── Custom keyframe-based transitions ───────────────────────────────────────
-// These work without any Adobe transition API — purely Motion/Opacity keyframes.
-
-function _motionOf(clip) {
-  var m = clip.getComponentByDisplayName('Motion');
-  if (!m) return null;
-  return {
-    scale: m.properties.getParamForDisplayName('Scale'),
-    pos:   m.properties.getParamForDisplayName('Position'),
-    rot:   m.properties.getParamForDisplayName('Rotation'),
-  };
-}
-
-function _opacityOf(clip) {
-  try {
-    var fx = clip.getComponentByDisplayName('Opacity');
-    if (!fx) return null;
-    return fx.properties.getParamForDisplayName('Opacity');
-  } catch (e) { return null; }
-}
-
-function _kf(sec) {
+function _tk(sec) {
   return { seconds: sec, ticks: msToTicks(sec * 1000) };
 }
 
-// Zoom Blur — extreme scale explosion + opacity fade (most viral TikTok style)
+// Find a component on a clip by display name / matchName — robust across PP versions.
+function _comp(clip, names) {
+  for (var a = 0; a < names.length; a++) {
+    try {
+      if (typeof clip.getComponentByDisplayName === 'function') {
+        var c = clip.getComponentByDisplayName(names[a]);
+        if (c) return c;
+      }
+    } catch (e) {}
+  }
+  try {
+    for (var i = 0; i < clip.components.numItems; i++) {
+      var comp = clip.components[i];
+      for (var b = 0; b < names.length; b++) {
+        try { if (comp.displayName === names[b]) return comp; } catch (e1) {}
+        try { if (comp.matchName === names[b]) return comp; } catch (e2) {}
+      }
+    }
+  } catch (e3) {}
+  return null;
+}
+
+function _param(comp, names) {
+  if (!comp) return null;
+  for (var a = 0; a < names.length; a++) {
+    try {
+      if (comp.properties && typeof comp.properties.getParamForDisplayName === 'function') {
+        var p = comp.properties.getParamForDisplayName(names[a]);
+        if (p) return p;
+      }
+    } catch (e) {}
+  }
+  try {
+    for (var i = 0; i < comp.properties.numItems; i++) {
+      var pp = comp.properties[i];
+      for (var b = 0; b < names.length; b++) {
+        try { if (pp.displayName === names[b]) return pp; } catch (e1) {}
+      }
+    }
+  } catch (e2) {}
+  return null;
+}
+
+function _enableKeys(p) {
+  try { p.setTimeVarying(true); return; } catch (e) {}
+  try { p.timeVarying = true; } catch (e2) {}
+}
+
+// Robustly set a keyframe. Tries the seconds-based API first (most widely
+// supported), then the Time-object API. Applies Bezier easing best-effort.
+function _key(p, sec, value, ease) {
+  if (!p) { _kfStat.fail++; return false; }
+  _enableKeys(p);
+  var ok = false;
+  // Method A: seconds-based  addKey(sec) + setValueAtKey(sec, val, true)
+  try {
+    p.addKey(sec);
+    try { p.setValueAtKey(sec, value, true); ok = true; }
+    catch (eA) { try { p.setValueAtKey(sec, value); ok = true; } catch (eA2) {} }
+  } catch (e) {}
+  // Method B: Time-object  addKey(t) + setValueAtTime(t, val)
+  if (!ok) {
+    try {
+      var t = _tk(sec);
+      p.addKey(t);
+      try { p.setValueAtTime(t, value); ok = true; } catch (eB) {}
+    } catch (e) {}
+  }
+  if (ok && ease) {
+    try { p.setInterpolationTypeAtKey(sec, KF_BEZIER, true); } catch (e) {}
+    try { p.setInterpolationTypeAtKey(_tk(sec), KF_BEZIER, true); } catch (e2) {}
+  }
+  if (ok) _kfStat.set++; else _kfStat.fail++;
+  return ok;
+}
+
+function _scaleKey(clip, sec, val) {
+  _key(_param(_comp(clip, ['Motion', 'AE.ADBE Motion']), ['Scale']), sec, val, true);
+}
+function _rotKey(clip, sec, deg) {
+  _key(_param(_comp(clip, ['Motion', 'AE.ADBE Motion']), ['Rotation']), sec, deg, true);
+}
+function _opKey(clip, sec, val) {
+  _key(_param(_comp(clip, ['Opacity', 'AE.ADBE Opacity']), ['Opacity']), sec, val, true);
+}
+
+// Deterministic per-cut jitter so transitions don't feel mechanically identical.
+function _vary(base, amt, i) {
+  var r = Math.sin((i + 1) * 12.9898) * 43758.5453;
+  r = r - Math.floor(r);            // 0..1
+  return base + (r * 2 - 1) * amt;  // base ± amt
+}
+
+// ── per-clip animation guard: skip if clip too short ──
+function _tooShort(clip, dur) {
+  return (clip.end.seconds - clip.start.seconds) < dur * 2.5;
+}
+
+// ── Zoom Blur: scale 100→210 + opacity 100→0 on exit; reverse on enter ──
+// The most viral style — feels fast and energetic.
 function addZoomBlurTransitions(durationFrames) {
   try {
     var seq = app.project.activeSequence;
     if (!seq) return JSON.stringify({ error: 'No active sequence' });
     var track = seq.videoTracks[0];
-    var fps   = seq.timebase;
-    var dur   = (durationFrames || 12) / fps;
+    var dur   = (durationFrames || 12) / _fps(seq);
+    var n     = track.clips.numItems;
 
-    for (var i = 0; i < track.clips.numItems; i++) {
+    for (var i = 0; i < n; i++) {
       var clip = track.clips[i];
-      var m    = _motionOf(clip);
-      var op   = _opacityOf(clip);
-      if (!m || !m.scale) continue;
+      if (_tooShort(clip, dur)) continue;
 
-      var clipLen = clip.end.seconds - clip.start.seconds;
-      if (clipLen < dur * 3) continue;
+      // Vary peak zoom (185–235%) and timing slightly per cut for a hand-made feel
+      var peak   = _vary(210, 25, i);
+      var dExit  = dur * _vary(1.0, 0.15, i);
+      var dEnter = dur * _vary(1.0, 0.15, i + 7);
 
-      // Zoom OUT + fade at end of clip (exit)
-      if (i < track.clips.numItems - 1) {
-        var eA = _kf(clip.end.seconds - dur);
-        var eB = _kf(clip.end.seconds);
-        m.scale.addKey(eA); m.scale.addKey(eB);
-        m.scale.setValueAtTime(eA, 100); m.scale.setValueAtTime(eB, 320);
-        if (op) { op.addKey(eA); op.addKey(eB); op.setValueAtTime(eA, 100); op.setValueAtTime(eB, 0); }
+      if (i < n - 1) {  // exit
+        _scaleKey(clip, clip.end.seconds - dExit, 100);
+        _scaleKey(clip, clip.end.seconds,         peak);
+        _opKey(clip,    clip.end.seconds - dExit * 0.7, 100);
+        _opKey(clip,    clip.end.seconds,           0);
       }
-
-      // Zoom IN + fade at start of clip (enter)
-      if (i > 0) {
-        var sA = _kf(clip.start.seconds);
-        var sB = _kf(clip.start.seconds + dur);
-        m.scale.addKey(sA); m.scale.addKey(sB);
-        m.scale.setValueAtTime(sA, 320); m.scale.setValueAtTime(sB, 100);
-        if (op) { op.addKey(sA); op.addKey(sB); op.setValueAtTime(sA, 0); op.setValueAtTime(sB, 100); }
+      if (i > 0) {       // enter
+        _scaleKey(clip, clip.start.seconds,          peak);
+        _scaleKey(clip, clip.start.seconds + dEnter, 100);
+        _opKey(clip,    clip.start.seconds,            0);
+        _opKey(clip,    clip.start.seconds + dEnter * 0.7, 100);
       }
     }
     return JSON.stringify({ success: true });
-  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
 }
 
-// Spin — rotation + scale squeeze (door/spin wipe)
+// ── Spin: rotate 0→80° + scale 100→5% + fade on exit; reverse on enter ──
 function addSpinTransitions(durationFrames) {
   try {
     var seq = app.project.activeSequence;
     if (!seq) return JSON.stringify({ error: 'No active sequence' });
     var track = seq.videoTracks[0];
-    var fps   = seq.timebase;
-    var dur   = (durationFrames || 12) / fps;
+    var dur   = (durationFrames || 12) / _fps(seq);
+    var n     = track.clips.numItems;
 
-    for (var i = 0; i < track.clips.numItems; i++) {
+    for (var i = 0; i < n; i++) {
       var clip = track.clips[i];
-      var m    = _motionOf(clip);
-      if (!m || !m.scale || !m.rot) continue;
+      if (_tooShort(clip, dur)) continue;
 
-      var clipLen = clip.end.seconds - clip.start.seconds;
-      if (clipLen < dur * 3) continue;
-
-      // Exit: rotate 0→90°, squeeze scale 100→0
-      if (i < track.clips.numItems - 1) {
-        var eA = _kf(clip.end.seconds - dur);
-        var eB = _kf(clip.end.seconds);
-        m.rot.addKey(eA); m.rot.addKey(eB);
-        m.rot.setValueAtTime(eA, 0); m.rot.setValueAtTime(eB, 90);
-        m.scale.addKey(eA); m.scale.addKey(eB);
-        m.scale.setValueAtTime(eA, 100); m.scale.setValueAtTime(eB, 10);
+      if (i < n - 1) {
+        _rotKey(clip,   clip.end.seconds - dur, 0);
+        _rotKey(clip,   clip.end.seconds,       80);
+        _scaleKey(clip, clip.end.seconds - dur, 100);
+        _scaleKey(clip, clip.end.seconds,         5);
+        _opKey(clip,    clip.end.seconds - dur * 0.6, 100);
+        _opKey(clip,    clip.end.seconds,              0);
       }
-
-      // Enter: rotate -90→0°, scale 0→100
       if (i > 0) {
-        var sA = _kf(clip.start.seconds);
-        var sB = _kf(clip.start.seconds + dur);
-        m.rot.addKey(sA); m.rot.addKey(sB);
-        m.rot.setValueAtTime(sA, -90); m.rot.setValueAtTime(sB, 0);
-        m.scale.addKey(sA); m.scale.addKey(sB);
-        m.scale.setValueAtTime(sA, 10); m.scale.setValueAtTime(sB, 100);
+        _rotKey(clip,   clip.start.seconds,      -80);
+        _rotKey(clip,   clip.start.seconds + dur,   0);
+        _scaleKey(clip, clip.start.seconds,          5);
+        _scaleKey(clip, clip.start.seconds + dur,  100);
+        _opKey(clip,    clip.start.seconds,          0);
+        _opKey(clip,    clip.start.seconds + dur * 0.4, 100);
       }
     }
     return JSON.stringify({ success: true });
-  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
 }
 
-// Slide — horizontal position push (clip A slides out left, clip B enters from right)
-function addSlideTransitions(durationFrames) {
-  try {
-    var seq = app.project.activeSequence;
-    if (!seq) return JSON.stringify({ error: 'No active sequence' });
-    var track = seq.videoTracks[0];
-    var fps   = seq.timebase;
-    var dur   = (durationFrames || 8) / fps;
-    var w     = seq.frameSizeHorizontal || 1920;
-    var h     = seq.frameSizeVertical   || 1080;
-    var cx    = w / 2;
-    var cy    = h / 2;
-
-    for (var i = 0; i < track.clips.numItems; i++) {
-      var clip = track.clips[i];
-      var m    = _motionOf(clip);
-      if (!m || !m.pos) continue;
-
-      var clipLen = clip.end.seconds - clip.start.seconds;
-      if (clipLen < dur * 3) continue;
-
-      // Exit: slide left off screen
-      if (i < track.clips.numItems - 1) {
-        var eA = _kf(clip.end.seconds - dur);
-        var eB = _kf(clip.end.seconds);
-        m.pos.addKey(eA); m.pos.addKey(eB);
-        try { m.pos.setValueAtTime(eA, [cx, cy]); m.pos.setValueAtTime(eB, [-cx, cy]); } catch(pe) {}
-      }
-
-      // Enter: slide in from right
-      if (i > 0) {
-        var sA = _kf(clip.start.seconds);
-        var sB = _kf(clip.start.seconds + dur);
-        m.pos.addKey(sA); m.pos.addKey(sB);
-        try { m.pos.setValueAtTime(sA, [w + cx, cy]); m.pos.setValueAtTime(sB, [cx, cy]); } catch(pe) {}
-      }
-    }
-    return JSON.stringify({ success: true });
-  } catch (e) { return JSON.stringify({ error: e.toString() }); }
-}
-
-// Shake — rapid camera shake at every cut (position oscillation)
-function addShakeTransitions(durationFrames) {
-  try {
-    var seq = app.project.activeSequence;
-    if (!seq) return JSON.stringify({ error: 'No active sequence' });
-    var track = seq.videoTracks[0];
-    var fps   = seq.timebase;
-    var dur   = (durationFrames || 10) / fps;
-    var cx    = (seq.frameSizeHorizontal || 1920) / 2;
-    var cy    = (seq.frameSizeVertical   || 1080) / 2;
-    var amp   = 38; // pixel shake amplitude
-
-    for (var i = 1; i < track.clips.numItems; i++) {
-      var clip = track.clips[i];
-      var m    = _motionOf(clip);
-      if (!m || !m.pos) continue;
-
-      // 8 oscillating keyframes that decay to zero
-      var steps  = 8;
-      var decays = [1, -0.8, 0.6, -0.45, 0.3, -0.2, 0.1, 0];
-      for (var j = 0; j < steps; j++) {
-        var tSec = clip.start.seconds + (dur / steps) * j;
-        var kf   = _kf(tSec);
-        m.pos.addKey(kf);
-        try { m.pos.setValueAtTime(kf, [cx + amp * decays[j], cy]); } catch(pe) {}
-      }
-      // Settle: last keyframe at center
-      var kfEnd = _kf(clip.start.seconds + dur);
-      m.pos.addKey(kfEnd);
-      try { m.pos.setValueAtTime(kfEnd, [cx, cy]); } catch(pe) {}
-    }
-    return JSON.stringify({ success: true });
-  } catch (e) { return JSON.stringify({ error: e.toString() }); }
-}
-
-// Glitch — rapid scale + position micro-jumps for a digital glitch effect
+// ── Glitch: 7 rapid scale micro-pulses on exit of every clip ──
+// Short bursts — each step is just 1-2 frames.
 function addGlitchTransitions(durationFrames) {
   try {
     var seq = app.project.activeSequence;
     if (!seq) return JSON.stringify({ error: 'No active sequence' });
     var track = seq.videoTracks[0];
-    var fps   = seq.timebase;
-    var dur   = (durationFrames || 8) / fps;
-    var cx    = (seq.frameSizeHorizontal || 1920) / 2;
-    var cy    = (seq.frameSizeVertical   || 1080) / 2;
+    var dur   = (durationFrames || 7) / _fps(seq);
+    var n     = track.clips.numItems;
 
-    var glitchScales = [100, 108, 96, 112, 98, 104, 100];
-    var glitchOffX   = [  0,  18, -12,  22, -8,   6,   0];
+    var scales = [100, 112, 93, 118, 90, 106, 100];
+    var ops    = [100,  75, 100,  55, 100,  85, 100];
 
-    for (var i = 0; i < track.clips.numItems; i++) {
+    for (var i = 0; i < n - 1; i++) {
       var clip = track.clips[i];
-      var m    = _motionOf(clip);
-      if (!m || !m.scale) continue;
-
-      var clipLen = clip.end.seconds - clip.start.seconds;
-      if (clipLen < dur * 2) continue;
-
-      // Glitch on exit of each clip
-      if (i < track.clips.numItems - 1) {
-        var step = dur / glitchScales.length;
-        for (var j = 0; j < glitchScales.length; j++) {
-          var tSec = (clip.end.seconds - dur) + step * j;
-          var kf   = _kf(tSec);
-          m.scale.addKey(kf);
-          m.scale.setValueAtTime(kf, glitchScales[j]);
-          if (m.pos) {
-            m.pos.addKey(kf);
-            try { m.pos.setValueAtTime(kf, [cx + glitchOffX[j], cy]); } catch(pe) {}
-          }
-        }
+      if (_tooShort(clip, dur)) continue;
+      var step = dur / (scales.length - 1);
+      for (var j = 0; j < scales.length; j++) {
+        var t = clip.end.seconds - dur + step * j;
+        if (t < clip.start.seconds) continue;
+        _scaleKey(clip, t, scales[j]);
+        _opKey(clip, t, ops[j]);
       }
     }
     return JSON.stringify({ success: true });
-  } catch (e) { return JSON.stringify({ error: e.toString() }); }
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
 }
 
-// Main transition dispatcher
+// ── Film Burn: fast fade-out + slight overexposure scale spike, then fade-in ──
+// Old-film analogue feel — warm and editorial.
+function addFilmBurnTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var dur   = (durationFrames || 10) / _fps(seq);
+    var half  = dur * 0.5;
+    var n     = track.clips.numItems;
+
+    for (var i = 0; i < n; i++) {
+      var clip = track.clips[i];
+      if (_tooShort(clip, dur)) continue;
+
+      if (i < n - 1) {
+        // Scale "burns" up briefly then fades to black
+        _scaleKey(clip, clip.end.seconds - dur,   100);
+        _scaleKey(clip, clip.end.seconds - half,  112); // overexposure spike
+        _scaleKey(clip, clip.end.seconds,         100);
+        _opKey(clip,    clip.end.seconds - dur,   100);
+        _opKey(clip,    clip.end.seconds,           0);
+      }
+      if (i > 0) {
+        _scaleKey(clip, clip.start.seconds,        112);
+        _scaleKey(clip, clip.start.seconds + half, 100);
+        _opKey(clip,    clip.start.seconds,          0);
+        _opKey(clip,    clip.start.seconds + dur,  100);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// ── Dissolve: simple opacity cross-fade (clean, minimal) ──
+function addDissolveTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var dur   = (durationFrames || 14) / _fps(seq);
+    var n     = track.clips.numItems;
+
+    for (var i = 0; i < n; i++) {
+      var clip = track.clips[i];
+      if (_tooShort(clip, dur)) continue;
+
+      if (i < n - 1) {
+        _opKey(clip, clip.end.seconds - dur, 100);
+        _opKey(clip, clip.end.seconds,         0);
+      }
+      if (i > 0) {
+        _opKey(clip, clip.start.seconds,       0);
+        _opKey(clip, clip.start.seconds + dur, 100);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// ── Flash: very fast opacity dip + quick scale spike (strobe / camera flash) ──
+function addFlashTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var dur   = (durationFrames || 6) / _fps(seq);
+    var half  = dur * 0.4;
+    var n     = track.clips.numItems;
+
+    for (var i = 0; i < n; i++) {
+      var clip = track.clips[i];
+      if (_tooShort(clip, dur)) continue;
+
+      if (i < n - 1) {
+        _scaleKey(clip, clip.end.seconds - dur,  100);
+        _scaleKey(clip, clip.end.seconds - half, 118); // bright flash spike
+        _scaleKey(clip, clip.end.seconds,        100);
+        _opKey(clip,    clip.end.seconds - dur,  100);
+        _opKey(clip,    clip.end.seconds,          0);
+      }
+      if (i > 0) {
+        _scaleKey(clip, clip.start.seconds,        118);
+        _scaleKey(clip, clip.start.seconds + half, 100);
+        _opKey(clip,    clip.start.seconds,          0);
+        _opKey(clip,    clip.start.seconds + dur,  100);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// ── Breathe: very subtle ambient scale 100→103→100 over each clip ──
+// Not a "cut transition" — it adds a slow organic heartbeat to every clip,
+// making the video feel alive even with hard cuts.
+function addBreatheEffect() {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+
+    for (var i = 0; i < track.clips.numItems; i++) {
+      var clip = track.clips[i];
+      var len  = clip.end.seconds - clip.start.seconds;
+      if (len < 0.8) continue;
+
+      var mid = clip.start.seconds + len * 0.5;
+      // Settle the scale at start so it doesn't fight with other transitions
+      _scaleKey(clip, clip.start.seconds,       100);
+      _scaleKey(clip, mid,                      103.5);
+      _scaleKey(clip, clip.end.seconds - 0.04, 100);
+    }
+    return JSON.stringify({ success: true });
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// ── Zoom Punch (legacy): scale 100→125 hit at cut ──
+function addZoomPunchTransitions(durationFrames) {
+  try {
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'No active sequence' });
+    var track = seq.videoTracks[0];
+    var dur   = (durationFrames || 10) / _fps(seq);
+    var n     = track.clips.numItems;
+
+    for (var i = 0; i < n; i++) {
+      var clip = track.clips[i];
+      if (_tooShort(clip, dur)) continue;
+
+      if (i < n - 1) {
+        _scaleKey(clip, clip.end.seconds - dur, 100);
+        _scaleKey(clip, clip.end.seconds,       125);
+      }
+      if (i > 0) {
+        _scaleKey(clip, clip.start.seconds,       125);
+        _scaleKey(clip, clip.start.seconds + dur, 100);
+      }
+    }
+    return JSON.stringify({ success: true });
+  } catch(e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// ── Main dispatcher ──
 function applyTransitions(transitionType, durationFrames) {
   var frames = durationFrames || 15;
-  switch (transitionType) {
-    case 'dissolve':  return addNamedTransitions('Cross Dissolve', frames);
-    case 'flash':     return addNamedTransitions('Dip to White',   frames);
-    case 'dip':       return addNamedTransitions('Dip to Black',   frames);
-    case 'zoom':      return addZoomPunchTransitions(Math.round(frames * 0.7));
-    // Custom keyframe-based transitions
-    case 'zoomBlur':  return addZoomBlurTransitions(frames);
-    case 'spin':      return addSpinTransitions(frames);
-    case 'slide':     return addSlideTransitions(Math.round(frames * 0.6));
-    case 'shake':     return addShakeTransitions(Math.round(frames * 0.8));
-    case 'glitch':    return addGlitchTransitions(Math.round(frames * 0.5));
-    default:          return JSON.stringify({ success: true }); // 'cut' = no transition
+  if (transitionType === 'cut' || !transitionType) {
+    return JSON.stringify({ success: true, transition: 'cut', keysSet: 0, keysFailed: 0 });
   }
+  _resetKf();
+  try {
+    switch (transitionType) {
+      case 'zoomBlur':  addZoomBlurTransitions(frames); break;
+      case 'spin':      addSpinTransitions(frames); break;
+      case 'glitch':    addGlitchTransitions(Math.round(frames * 0.55)); break;
+      case 'filmBurn':  addFilmBurnTransitions(frames); break;
+      case 'breathe':   addBreatheEffect(); break;
+      case 'dissolve':  addDissolveTransitions(frames); break;
+      case 'flash':     addFlashTransitions(Math.round(frames * 0.5)); break;
+      case 'dip':       addDissolveTransitions(Math.round(frames * 0.8)); break;
+      case 'zoom':      addZoomPunchTransitions(Math.round(frames * 0.7)); break;
+    }
+  } catch (e) {
+    return JSON.stringify({ error: e.toString(), keysSet: _kfStat.set, keysFailed: _kfStat.fail });
+  }
+  return JSON.stringify({
+    success: true,
+    transition: transitionType,
+    keysSet: _kfStat.set,
+    keysFailed: _kfStat.fail,
+  });
 }
 
 // ─── Captions ─────────────────────────────────────────────────────────────────
@@ -545,20 +613,14 @@ function applyZoom(startMs, endMs, scale) {
     if (!track) return JSON.stringify({ error: 'No video track' });
     var startSec = startMs / 1000;
     var endSec   = endMs   / 1000;
+    var peak     = scale * 100;
 
     for (var i = 0; i < track.clips.numItems; i++) {
       var clip = track.clips[i];
-      // Check if this clip's timeline range overlaps with the zoom range
+      // Apply if this clip's timeline range overlaps the zoom range
       if (clip.start.seconds <= startSec && clip.end.seconds >= endSec) {
-        var motion = clip.getComponentByDisplayName('Motion');
-        if (!motion) continue;
-        var scaleParam = motion.properties.getParamForDisplayName('Scale');
-        if (!scaleParam) continue;
-        var t0 = { seconds: startSec, ticks: msToTicks(startMs) };
-        var t1 = { seconds: endSec,   ticks: msToTicks(endMs) };
-        scaleParam.addKey(t0); scaleParam.addKey(t1);
-        scaleParam.setValueAtTime(t0, 100);
-        scaleParam.setValueAtTime(t1, scale * 100);
+        _scaleKey(clip, startSec, 100);
+        _scaleKey(clip, endSec,   peak);
       }
     }
     return JSON.stringify({ success: true });

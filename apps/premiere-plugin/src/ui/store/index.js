@@ -196,7 +196,27 @@ ${exampleSegs}
             const raw = data.choices[0]?.message.content ?? '{}';
             const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
             const plan = JSON.parse(jsonStr);
-            const segs = plan.keepSegments ?? [{ startMs: startGuess, endMs: startGuess + targetMs }];
+            const rawSegs = plan.keepSegments ?? [{ startMs: startGuess, endMs: startGuess + targetMs }];
+            // Hard-cap total duration to exactly targetMs — AI often over-generates
+            let accumulated = 0;
+            const segs = [];
+            for (const seg of rawSegs) {
+                const segDur = seg.endMs - seg.startMs;
+                if (segDur <= 0)
+                    continue;
+                const left = targetMs - accumulated;
+                if (left <= 0)
+                    break;
+                if (segDur > left) {
+                    segs.push({ ...seg, endMs: seg.startMs + left });
+                    accumulated = targetMs;
+                    break;
+                }
+                segs.push(seg);
+                accumulated += segDur;
+            }
+            if (segs.length === 0)
+                segs.push({ startMs: startGuess, endMs: startGuess + targetMs });
             const clipStartMs = segs[0]?.startMs ?? startGuess;
             const clipEndMs = segs[segs.length - 1]?.endMs ?? startGuess + targetMs;
             const clip = {

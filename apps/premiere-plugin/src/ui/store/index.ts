@@ -44,7 +44,7 @@ export interface EditPlan {
   descriptionSuggestion: string | null;
   hashtagsJson: unknown;
   format: '9:16' | '16:9' | '1:1';
-  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
+  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'glitch' | 'filmBurn' | 'breathe';
 }
 
 export interface Export {
@@ -92,7 +92,7 @@ export interface AnalysisOptions {
   removeSilence: boolean;
   removeRepetitions: boolean;
   format: '9:16' | '16:9' | '1:1';
-  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
+  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'glitch' | 'filmBurn' | 'breathe';
 }
 
 export interface ApplyEditResult {
@@ -103,7 +103,7 @@ export interface ApplyEditResult {
     transitions: unknown[];
     effects: unknown[];
     format: '9:16' | '16:9' | '1:1';
-    transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'slide' | 'shake' | 'glitch';
+    transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip' | 'zoomBlur' | 'spin' | 'glitch' | 'filmBurn' | 'breathe';
   };
   clip: {
     startMs: number;
@@ -347,7 +347,26 @@ ${exampleSegs}
             zooms?: unknown[]; captions?: unknown[]; hashtags?: string[];
           };
 
-          const segs = plan.keepSegments ?? [{ startMs: startGuess, endMs: startGuess + targetMs }];
+          const rawSegs = plan.keepSegments ?? [{ startMs: startGuess, endMs: startGuess + targetMs }];
+
+          // Hard-cap total duration to exactly targetMs — AI often over-generates
+          let accumulated = 0;
+          const segs: typeof rawSegs = [];
+          for (const seg of rawSegs) {
+            const segDur = seg.endMs - seg.startMs;
+            if (segDur <= 0) continue;
+            const left = targetMs - accumulated;
+            if (left <= 0) break;
+            if (segDur > left) {
+              segs.push({ ...seg, endMs: seg.startMs + left });
+              accumulated = targetMs;
+              break;
+            }
+            segs.push(seg);
+            accumulated += segDur;
+          }
+          if (segs.length === 0) segs.push({ startMs: startGuess, endMs: startGuess + targetMs });
+
           const clipStartMs = segs[0]?.startMs ?? startGuess;
           const clipEndMs = segs[segs.length - 1]?.endMs ?? startGuess + targetMs;
 
