@@ -78,8 +78,7 @@ function clearAllTracks(seq) {
 function setupSequenceWithMultipleClips(clipNamesJson, segmentsJson) {
   try {
     var clipNames = JSON.parse(clipNamesJson);
-    var segments  = JSON.parse(segmentsJson);
-    if (!segments || segments.length === 0) return JSON.stringify({ error: 'No segments' });
+    var segments  = JSON.parse(segmentsJson) || [];
 
     var clips = [];
     for (var c = 0; c < clipNames.length; c++) {
@@ -87,6 +86,7 @@ function setupSequenceWithMultipleClips(clipNamesJson, segmentsJson) {
       if (!found) return JSON.stringify({ error: 'Clip not found: ' + clipNames[c] });
       clips.push(found);
     }
+    if (clips.length === 0) return JSON.stringify({ error: 'No clips' });
 
     var seqName = clipNames[0].substring(0, 30) + ' - ShortForge Merge';
     app.project.createNewSequenceFromClips(seqName, [clips[0]], app.project.rootItem);
@@ -95,20 +95,53 @@ function setupSequenceWithMultipleClips(clipNamesJson, segmentsJson) {
 
     clearAllTracks(seq);
 
+    // ONE clip per uploaded video — the timeline gets exactly as many clips as
+    // videos the user dropped. We iterate over the videos, not the segments, so
+    // the clip count can never exceed the number of source videos.
     var timelineSec = 0;
-    for (var k = 0; k < segments.length; k++) {
-      var seg    = segments[k];
-      var idx    = (typeof seg.clipIndex === 'number' ? seg.clipIndex : 0);
-      if (idx >= clips.length) idx = 0;
-      var src    = clips[idx];
-      var inSec  = seg.startMs / 1000;
-      var outSec = seg.endMs   / 1000;
+    var inserted = 0;
+    for (var i = 0; i < clips.length; i++) {
+      var src = clips[i];
+
+      // Real media length (untrimmed footage) for clamping in/out points.
+      var mediaDur = 0;
+      try { mediaDur = src.getOutPoint().seconds; } catch (eDur) {}
+
+      // Find the segment the planner assigned to this video.
+      var seg = null;
+      for (var s = 0; s < segments.length; s++) {
+        var sIdx = (typeof segments[s].clipIndex === 'number' ? segments[s].clipIndex : s);
+        if (sIdx === i) { seg = segments[s]; break; }
+      }
+
+      var inSec  = seg ? (seg.startMs / 1000) : 0;
+      var outSec = seg ? (seg.endMs   / 1000) : (mediaDur || 0);
+      if (mediaDur > 0) {
+        if (outSec > mediaDur) outSec = mediaDur;
+        if (inSec >= mediaDur) inSec = 0;
+      }
+      if (outSec <= inSec) {
+        inSec = 0;
+        outSec = (mediaDur > 0 ? mediaDur : (seg ? (seg.endMs - seg.startMs) / 1000 : 0));
+      }
       if (outSec <= inSec) continue;
-      seq.videoTracks[0].insertClip(src, timelineSec, inSec, outSec);
-      timelineSec += (outSec - inSec);
+
+      try {
+        seq.videoTracks[0].insertClip(src, timelineSec, inSec, outSec);
+        timelineSec += (outSec - inSec);
+        inserted++;
+      } catch (insErr) {
+        // Out point likely exceeded media — retry with the full clip.
+        try {
+          var fullOut = (mediaDur > 0 ? mediaDur : outSec);
+          seq.videoTracks[0].insertClip(src, timelineSec, 0, fullOut);
+          timelineSec += fullOut;
+          inserted++;
+        } catch (e2) {}
+      }
     }
 
-    return JSON.stringify({ success: true, name: seq.name, totalMs: Math.round(timelineSec * 1000) });
+    return JSON.stringify({ success: true, name: seq.name, clips: inserted, totalMs: Math.round(timelineSec * 1000) });
   } catch (e) {
     return JSON.stringify({ error: e.toString() });
   }

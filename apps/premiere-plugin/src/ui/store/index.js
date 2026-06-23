@@ -146,8 +146,10 @@ Remove filler words: ${options.removeFillers}
 Remove silences: ${options.removeSilence}
 
 Instructions:
-1. ${isMulti ? `Merge ALL ${videoList.length} videos into one ${options.targetDuration}s clip — take the best moments from each` : `Pick the best ${options.targetDuration}s starting around ${Math.round(firstDurMs / 1000 * 0.1)}s`}
-2. Split into 5-8 keep segments with 0.3-1s gaps (simulating silence/pause removal)
+1. ${isMulti ? `Merge ALL ${videoList.length} videos into one ${options.targetDuration}s clip — take the best moment from each` : `Pick the best ${options.targetDuration}s starting around ${Math.round(firstDurMs / 1000 * 0.1)}s`}
+2. ${isMulti
+            ? `Return EXACTLY ${videoList.length} keep segments — ONE per source video (clipIndex 0 to ${videoList.length - 1}), each the single best moment of that video. Do NOT add extra segments.`
+            : `Split into 5-8 keep segments with 0.3-1s gaps (simulating silence/pause removal)`}
 3. Every segment MUST include "clipIndex" (0-based index of the source video)
 4. Total of all keepSegments durations must equal exactly ${options.targetDuration}s
 5. Captions: one short punchy line every 2-4 seconds (RELATIVE to final clip start at 0)
@@ -197,26 +199,46 @@ ${exampleSegs}
             const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
             const plan = JSON.parse(jsonStr);
             const rawSegs = plan.keepSegments ?? [{ startMs: startGuess, endMs: startGuess + targetMs }];
-            // Hard-cap total duration to exactly targetMs — AI often over-generates
-            let accumulated = 0;
-            const segs = [];
-            for (const seg of rawSegs) {
-                const segDur = seg.endMs - seg.startMs;
-                if (segDur <= 0)
-                    continue;
-                const left = targetMs - accumulated;
-                if (left <= 0)
-                    break;
-                if (segDur > left) {
-                    segs.push({ ...seg, endMs: seg.startMs + left });
-                    accumulated = targetMs;
-                    break;
-                }
-                segs.push(seg);
-                accumulated += segDur;
+            let segs = [];
+            if (isMulti) {
+                // ONE clip per uploaded video — the timeline gets exactly as many clips
+                // as videos the user dropped. Each video is trimmed to its fair share.
+                const share = Math.max(500, Math.floor(targetMs / videoList.length));
+                segs = videoList.map((v, i) => {
+                    const durMs = (v.durationSeconds ?? 0) * 1000;
+                    const ai = rawSegs.find((s) => (s.clipIndex ?? -1) === i) ?? rawSegs[i];
+                    let start = ai ? Math.max(0, ai.startMs) : 0;
+                    let end = ai && ai.endMs > ai.startMs ? ai.endMs : start + share;
+                    if (end - start > share)
+                        end = start + share;
+                    if (durMs > 0 && end > durMs) {
+                        end = durMs;
+                        start = Math.max(0, end - share);
+                    }
+                    return { clipIndex: i, startMs: start, endMs: end };
+                });
             }
-            if (segs.length === 0)
-                segs.push({ startMs: startGuess, endMs: startGuess + targetMs });
+            else {
+                // Single video: cut into the AI's segments but hard-cap total to targetMs.
+                let accumulated = 0;
+                for (const seg of rawSegs) {
+                    const segDur = seg.endMs - seg.startMs;
+                    if (segDur <= 0)
+                        continue;
+                    const left = targetMs - accumulated;
+                    if (left <= 0)
+                        break;
+                    if (segDur > left) {
+                        segs.push({ ...seg, endMs: seg.startMs + left });
+                        accumulated = targetMs;
+                        break;
+                    }
+                    segs.push(seg);
+                    accumulated += segDur;
+                }
+                if (segs.length === 0)
+                    segs.push({ startMs: startGuess, endMs: startGuess + targetMs });
+            }
             const clipStartMs = segs[0]?.startMs ?? startGuess;
             const clipEndMs = segs[segs.length - 1]?.endMs ?? startGuess + targetMs;
             const clip = {
