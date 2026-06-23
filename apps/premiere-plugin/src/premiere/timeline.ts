@@ -41,6 +41,9 @@ export interface EditPlanInstructions {
   zooms: ZoomInstruction[];
   captions: CaptionInstruction[];
   effects: EffectInstruction[];
+  format?: '9:16' | '16:9' | '1:1';
+  transitionType?: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
+  transitionFrames?: number;
 }
 
 function evalScript(script: string): Promise<string> {
@@ -85,6 +88,10 @@ export class TimelineManager {
     if (data.error) throw new Error(`Could not set up sequence: ${data.error}`);
   }
 
+  async reframeSequence(format: '9:16' | '16:9' | '1:1'): Promise<void> {
+    await evalScript(`reframeSequence(${JSON.stringify(format)})`);
+  }
+
   async applyEditPlan(instructions: EditPlanInstructions): Promise<void> {
     for (const zoom of instructions.zooms) {
       await evalScript(`applyZoom(${zoom.startMs}, ${zoom.endMs}, ${zoom.scale})`);
@@ -97,7 +104,13 @@ export class TimelineManager {
       if (data.error) console.warn('[ShortForge] Caption import failed:', data.error);
     }
 
-    await evalScript('addTransitionsBetweenClips(15)');
+    const transitionType = instructions.transitionType ?? 'cut';
+    const frames = instructions.transitionFrames ?? 15;
+    await evalScript(`applyTransitions(${JSON.stringify(transitionType)}, ${frames})`);
+
+    if (instructions.format && instructions.format !== '16:9') {
+      await this.reframeSequence(instructions.format);
+    }
   }
 
   async setPlayheadPosition(timeMs: number): Promise<void> {

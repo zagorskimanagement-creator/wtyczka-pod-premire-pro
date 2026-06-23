@@ -10,6 +10,8 @@ interface EditorProps {
 const PLATFORMS = ['TIKTOK', 'INSTAGRAM_REELS', 'YOUTUBE_SHORTS'] as const;
 const CAPTION_STYLES = ['TIKTOK', 'HORMOZI', 'GADZHI', 'MRBEAST'] as const;
 const DURATIONS = ['15', '30', '45', '60'] as const;
+const FORMATS = ['9:16', '16:9', '1:1'] as const;
+const TRANSITIONS = ['cut', 'dissolve', 'zoom', 'flash', 'dip'] as const;
 
 export function Editor({ onNavigate }: EditorProps) {
   const {
@@ -24,6 +26,8 @@ export function Editor({ onNavigate }: EditorProps) {
   const [platform, setPlatform] = useState<typeof PLATFORMS[number]>('TIKTOK');
   const [captionStyle, setCaptionStyle] = useState<typeof CAPTION_STYLES[number]>('TIKTOK');
   const [duration, setDuration] = useState<typeof DURATIONS[number]>('60');
+  const [format, setFormat] = useState<typeof FORMATS[number]>('9:16');
+  const [transitionType, setTransitionType] = useState<typeof TRANSITIONS[number]>('dissolve');
   const [removeFillers, setRemoveFillers] = useState(true);
   const [removeSilence, setRemoveSilence] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
@@ -50,6 +54,8 @@ export function Editor({ onNavigate }: EditorProps) {
       removeFillers,
       removeSilence,
       removeRepetitions: true,
+      format,
+      transitionType,
     });
   };
 
@@ -77,6 +83,9 @@ export function Editor({ onNavigate }: EditorProps) {
         zooms: (result.editPlan.zooms as ZoomInstruction[]),
         captions: (result.editPlan.captions as CaptionInstruction[]),
         effects: (result.editPlan.effects as EffectInstruction[]),
+        format: result.editPlan.format,
+        transitionType: result.editPlan.transitionType,
+        transitionFrames: 15,
       });
 
       setApplySuccess(true);
@@ -176,6 +185,36 @@ export function Editor({ onNavigate }: EditorProps) {
                 onClick={() => setDuration(d)}
               >
                 {d}s
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.settingGroup}>
+          <label>Output Format</label>
+          <div className={styles.chipGroup}>
+            {FORMATS.map((f) => (
+              <button
+                key={f}
+                className={`${styles.chip} ${format === f ? styles.chipActive : ''}`}
+                onClick={() => setFormat(f)}
+              >
+                {f === '9:16' ? 'TikTok 9:16' : f === '1:1' ? 'Square 1:1' : 'Wide 16:9'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.settingGroup}>
+          <label>Transition Style</label>
+          <div className={styles.chipGroup}>
+            {TRANSITIONS.map((t) => (
+              <button
+                key={t}
+                className={`${styles.chip} ${transitionType === t ? styles.chipActive : ''}`}
+                onClick={() => setTransitionType(t)}
+              >
+                {t === 'cut' ? 'Cut' : t === 'dissolve' ? 'Dissolve' : t === 'zoom' ? 'Zoom Punch' : t === 'flash' ? 'Flash' : 'Dip Black'}
               </button>
             ))}
           </div>

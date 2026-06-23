@@ -42,6 +42,8 @@ export interface EditPlan {
   titleSuggestion: string | null;
   descriptionSuggestion: string | null;
   hashtagsJson: unknown;
+  format: '9:16' | '16:9' | '1:1';
+  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
 }
 
 export interface Export {
@@ -87,6 +89,8 @@ export interface AnalysisOptions {
   removeFillers: boolean;
   removeSilence: boolean;
   removeRepetitions: boolean;
+  format: '9:16' | '16:9' | '1:1';
+  transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
 }
 
 export interface ApplyEditResult {
@@ -96,6 +100,8 @@ export interface ApplyEditResult {
     captions: unknown[];
     transitions: unknown[];
     effects: unknown[];
+    format: '9:16' | '16:9' | '1:1';
+    transitionType: 'cut' | 'dissolve' | 'zoom' | 'flash' | 'dip';
   };
   clip: {
     startMs: number;
@@ -342,6 +348,8 @@ Return ONLY valid JSON (no markdown, no explanation):
             titleSuggestion: plan.title ?? null,
             descriptionSuggestion: plan.description ?? null,
             hashtagsJson: plan.hashtags ?? [],
+            format: options.format,
+            transitionType: options.transitionType,
           };
 
           set((state) => ({
@@ -374,6 +382,8 @@ Return ONLY valid JSON (no markdown, no explanation):
             captions: (project.editPlan.captionsJson as unknown[]) ?? [],
             transitions: (project.editPlan.transitionsJson as unknown[]) ?? [],
             effects: (project.editPlan.effectsJson as unknown[]) ?? [],
+            format: project.editPlan.format ?? '16:9',
+            transitionType: project.editPlan.transitionType ?? 'cut',
           },
           clip: {
             startMs: clip?.startMs ?? 0,

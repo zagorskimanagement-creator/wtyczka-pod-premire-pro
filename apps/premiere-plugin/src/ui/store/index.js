@@ -203,6 +203,8 @@ Return ONLY valid JSON (no markdown, no explanation):
                 titleSuggestion: plan.title ?? null,
                 descriptionSuggestion: plan.description ?? null,
                 hashtagsJson: plan.hashtags ?? [],
+                format: options.format,
+                transitionType: options.transitionType,
             };
             set((state) => ({
                 projects: state.projects.map((p) => p.id === projectId ? { ...p, status: 'ANALYZED', clips: [clip], editPlan } : p),
@@ -230,6 +232,8 @@ Return ONLY valid JSON (no markdown, no explanation):
                 captions: project.editPlan.captionsJson ?? [],
                 transitions: project.editPlan.transitionsJson ?? [],
                 effects: project.editPlan.effectsJson ?? [],
+                format: project.editPlan.format ?? '16:9',
+                transitionType: project.editPlan.transitionType ?? 'cut',
             },
             clip: {
                 startMs: clip?.startMs ?? 0,
