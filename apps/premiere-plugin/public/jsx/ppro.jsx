@@ -41,6 +41,45 @@ function createSequence(name) {
   }
 }
 
+function createSequenceFromClip(clipName) {
+  try {
+    var root = app.project.rootItem;
+    var targetItem = null;
+
+    // Search project items for the clip
+    for (var i = 0; i < root.children.numItems; i++) {
+      var item = root.children[i];
+      if (item.name.indexOf(clipName) !== -1 || clipName.indexOf(item.name) !== -1) {
+        targetItem = item;
+        break;
+      }
+    }
+
+    // Fall back to first video item if name not matched
+    if (!targetItem) {
+      for (var j = 0; j < root.children.numItems; j++) {
+        var child = root.children[j];
+        if (child.type === ProjectItemType.CLIP) {
+          targetItem = child;
+          break;
+        }
+      }
+    }
+
+    if (!targetItem) return JSON.stringify({ error: 'No clip found in project' });
+
+    // Create sequence from clip (matches clip settings automatically)
+    app.project.createNewSequenceFromClips(clipName, [targetItem], app.project.rootItem);
+
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'Sequence created but not active' });
+
+    return JSON.stringify({ success: true, name: seq.name });
+  } catch (e) {
+    return JSON.stringify({ error: e.toString() });
+  }
+}
+
 function removeCut(startMs, endMs) {
   try {
     app.enableQE();

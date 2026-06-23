@@ -46,6 +46,7 @@ export function Editor({ onNavigate }) {
         try {
             const result = await applyEditPlan(activeProjectId, selectedClipIndex);
             const tm = new TimelineManager();
+            await tm.ensureSequenceExists(currentProject?.name ?? 'ShortForge Clip');
             await tm.applyEditPlan({
                 cuts: result.editPlan.cuts ?? [],
                 zooms: result.editPlan.zooms ?? [],

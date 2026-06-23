@@ -63,6 +63,14 @@ export class TimelineManager {
     await evalScript(`createSequence(${JSON.stringify(name)})`);
   }
 
+  async ensureSequenceExists(clipName: string): Promise<void> {
+    const info = await this.getSequenceInfo();
+    if (info) return;
+    const result = await evalScript(`createSequenceFromClip(${JSON.stringify(clipName)})`);
+    const data = JSON.parse(result) as { error?: string };
+    if (data.error) throw new Error(`Could not create sequence: ${data.error}`);
+  }
+
   async applyEditPlan(instructions: EditPlanInstructions): Promise<void> {
     for (const cut of instructions.cuts) {
       if (cut.type === 'remove') {

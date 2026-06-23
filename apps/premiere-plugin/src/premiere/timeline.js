@@ -14,6 +14,15 @@ export class TimelineManager {
     async createNewSequence(name) {
         await evalScript(`createSequence(${JSON.stringify(name)})`);
     }
+    async ensureSequenceExists(clipName) {
+        const info = await this.getSequenceInfo();
+        if (info)
+            return;
+        const result = await evalScript(`createSequenceFromClip(${JSON.stringify(clipName)})`);
+        const data = JSON.parse(result);
+        if (data.error)
+            throw new Error(`Could not create sequence: ${data.error}`);
+    }
     async applyEditPlan(instructions) {
         for (const cut of instructions.cuts) {
             if (cut.type === 'remove') {
