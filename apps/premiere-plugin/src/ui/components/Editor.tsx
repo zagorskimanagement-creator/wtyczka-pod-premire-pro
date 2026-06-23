@@ -63,26 +63,20 @@ export function Editor({ onNavigate }: EditorProps) {
       const result = await applyEditPlan(activeProjectId, selectedClipIndex);
 
       const tm = new TimelineManager();
-      const clip = currentProject?.clips?.[selectedClipIndex];
-      await tm.setupSequenceWithClip(
+      const keepSegments = result.editPlan.keepSegments as Array<{ startMs: number; endMs: number }>;
+
+      // Build sequence with multiple keep segments (actual cuts on timeline)
+      await tm.setupSequenceWithSegments(
         currentProject?.name ?? 'ShortForge Clip',
-        result.clip.startMs,
-        result.clip.endMs,
+        keepSegments,
       );
-      // Remap zoom/caption times to be relative to clip start
-      const offset = clip?.startMs ?? 0;
-      const remap = (ms: number) => Math.max(0, ms - offset);
+
+      // Captions and zooms are already relative to the final edited clip (start at 0)
       await tm.applyEditPlan({
-        cuts: [],
-        zooms: (result.editPlan.zooms as ZoomInstruction[]).map((z) => ({
-          ...z, startMs: remap(z.startMs), endMs: remap(z.endMs),
-        })),
-        captions: (result.editPlan.captions as CaptionInstruction[]).map((c) => ({
-          ...c, startMs: remap(c.startMs), endMs: remap(c.endMs),
-        })),
-        effects: (result.editPlan.effects as EffectInstruction[]).map((e) => ({
-          ...e, startMs: remap(e.startMs), endMs: remap(e.endMs),
-        })),
+        keepSegments,
+        zooms: (result.editPlan.zooms as ZoomInstruction[]),
+        captions: (result.editPlan.captions as CaptionInstruction[]),
+        effects: (result.editPlan.effects as EffectInstruction[]),
       });
 
       setApplySuccess(true);
@@ -316,7 +310,6 @@ function formatMs(ms: number): string {
   return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
 }
 
-// CutInstruction unused — cuts handled via in/out points at sequence creation
 interface ZoomInstruction { startMs: number; endMs: number; scale: number; posX: number; posY: number; easing: string; }
 interface CaptionInstruction { text: string; startMs: number; endMs: number; positionY: number; fontSize: number; colorHex: string; strokeColor: string; strokeWidth: number; }
 interface EffectInstruction { startMs: number; endMs: number; type: string; params: Record<string, number | string>; }

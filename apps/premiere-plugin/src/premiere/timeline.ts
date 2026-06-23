@@ -3,10 +3,9 @@ declare const CSInterface: new () => {
   evalScript(script: string, callback?: (result: string) => void): void;
 };
 
-export interface CutInstruction {
+export interface KeepSegment {
   startMs: number;
   endMs: number;
-  type: 'keep' | 'remove';
 }
 
 export interface ZoomInstruction {
@@ -38,7 +37,7 @@ export interface EffectInstruction {
 }
 
 export interface EditPlanInstructions {
-  cuts: CutInstruction[];
+  keepSegments: KeepSegment[];
   zooms: ZoomInstruction[];
   captions: CaptionInstruction[];
   effects: EffectInstruction[];
@@ -54,6 +53,21 @@ function evalScript(script: string): Promise<string> {
   });
 }
 
+function msToSRTTime(ms: number): string {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const f = ms % 1000;
+  const pad = (n: number, l = 2) => String(n).padStart(l, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(f, 3)}`;
+}
+
+function buildSRT(captions: CaptionInstruction[]): string {
+  return captions
+    .map((c, i) => `${i + 1}\n${msToSRTTime(c.startMs)} --> ${msToSRTTime(c.endMs)}\n${c.text}`)
+    .join('\n\n');
+}
+
 export class TimelineManager {
   async importVideoToProject(filePath: string): Promise<void> {
     await evalScript(`importVideo(${JSON.stringify(filePath)})`);
@@ -63,20 +77,27 @@ export class TimelineManager {
     await evalScript(`createSequence(${JSON.stringify(name)})`);
   }
 
-  async setupSequenceWithClip(clipName: string, startMs: number, endMs: number): Promise<void> {
-    const result = await evalScript(`setupSequenceWithClip(${JSON.stringify(clipName)}, ${startMs}, ${endMs})`);
+  async setupSequenceWithSegments(clipName: string, segments: KeepSegment[]): Promise<void> {
+    const result = await evalScript(
+      `setupSequenceWithSegments(${JSON.stringify(clipName)}, ${JSON.stringify(JSON.stringify(segments))})`,
+    );
     const data = JSON.parse(result) as { error?: string };
     if (data.error) throw new Error(`Could not set up sequence: ${data.error}`);
   }
 
   async applyEditPlan(instructions: EditPlanInstructions): Promise<void> {
-    // Cuts are handled via in/out points at sequence creation — skip removeCut
     for (const zoom of instructions.zooms) {
       await evalScript(`applyZoom(${zoom.startMs}, ${zoom.endMs}, ${zoom.scale})`);
     }
-    for (const caption of instructions.captions) {
-      console.log(`[ShortForge] Caption: "${caption.text}" ${caption.startMs}-${caption.endMs}ms`);
+
+    if (instructions.captions.length > 0) {
+      const srt = buildSRT(instructions.captions);
+      const result = await evalScript(`importCaptionsText(${JSON.stringify(srt)})`);
+      const data = JSON.parse(result) as { error?: string };
+      if (data.error) console.warn('[ShortForge] Caption import failed:', data.error);
     }
+
+    await evalScript('addTransitionsBetweenClips(15)');
   }
 
   async setPlayheadPosition(timeMs: number): Promise<void> {

@@ -91,7 +91,7 @@ export interface AnalysisOptions {
 
 export interface ApplyEditResult {
   editPlan: {
-    cuts: unknown[];
+    keepSegments: unknown[];
     zooms: unknown[];
     captions: unknown[];
     transitions: unknown[];
@@ -239,37 +239,45 @@ export const useStore = create<AppState>()(
         const targetMs = parseInt(options.targetDuration) * 1000;
         const startGuess = Math.round(durationMs * 0.1);
 
-        const prompt = `You are a professional video editor specializing in viral short-form content.
-Generate an edit plan for this video clip.
+        const prompt = `You are a professional viral video editor. Generate a complete edit plan for a short-form video.
 
-Video:
-- Name: ${currentProject?.name ?? 'Unknown'}
+Video info:
+- Name: "${currentProject?.name ?? 'Unknown'}"
 - Total duration: ${Math.round(durationMs / 1000)}s
-- Target platform: ${options.platform.replace('_', ' ')}
-- Target clip duration: ${options.targetDuration}s
+- Target platform: ${options.platform.replace(/_/g, ' ')}
+- Target final duration: ${options.targetDuration}s
 - Caption style: ${options.captionStyle}
 - Remove filler words: ${options.removeFillers}
 - Remove silences: ${options.removeSilence}
 
-Pick the single most engaging ${options.targetDuration}s window from the video.
-Return ONLY valid JSON (no markdown fences, no explanation):
+Instructions:
+1. Pick the best ${options.targetDuration}s starting around ${Math.round(durationMs / 1000 * 0.1)}s into the video
+2. Simulate silence/pause removal: split into 5-8 short keep segments with 0.3-1s gaps removed between them
+3. Total of all keepSegments durations must equal exactly ${options.targetDuration}s
+4. Captions: one short punchy line every 2-4 seconds (times are RELATIVE to the final edited clip, starting at 0)
+5. Zooms: 1-2 subtle zoom-ins for emphasis (times also relative to clip start)
+
+Return ONLY valid JSON (no markdown, no explanation):
 {
-  "title": "viral title here",
-  "description": "one line description",
-  "viralScore": 82,
-  "hookScore": 75,
-  "startMs": ${startGuess},
-  "endMs": ${startGuess + targetMs},
-  "cuts": [
-    {"startMs": 0, "endMs": ${startGuess}, "type": "remove"},
-    {"startMs": ${startGuess}, "endMs": ${startGuess + targetMs}, "type": "keep"}
+  "title": "VIRAL TITLE IN CAPS",
+  "description": "one hook sentence",
+  "viralScore": 85,
+  "hookScore": 78,
+  "keepSegments": [
+    {"startMs": ${startGuess}, "endMs": ${startGuess + Math.round(targetMs * 0.18)}},
+    {"startMs": ${startGuess + Math.round(targetMs * 0.19)}, "endMs": ${startGuess + Math.round(targetMs * 0.37)}},
+    {"startMs": ${startGuess + Math.round(targetMs * 0.38)}, "endMs": ${startGuess + Math.round(targetMs * 0.57)}},
+    {"startMs": ${startGuess + Math.round(targetMs * 0.58)}, "endMs": ${startGuess + Math.round(targetMs * 0.76)}},
+    {"startMs": ${startGuess + Math.round(targetMs * 0.77)}, "endMs": ${startGuess + targetMs}}
   ],
   "zooms": [
-    {"startMs": ${Math.round(targetMs * 0.1)}, "endMs": ${Math.round(targetMs * 0.3)}, "scale": 1.15, "posX": 0.5, "posY": 0.5, "easing": "ease-in-out"}
+    {"startMs": ${Math.round(targetMs * 0.05)}, "endMs": ${Math.round(targetMs * 0.20)}, "scale": 1.15, "posX": 0.5, "posY": 0.5, "easing": "ease-in-out"},
+    {"startMs": ${Math.round(targetMs * 0.55)}, "endMs": ${Math.round(targetMs * 0.70)}, "scale": 1.12, "posX": 0.5, "posY": 0.5, "easing": "ease-in-out"}
   ],
   "captions": [
-    {"text": "Opening hook", "startMs": 0, "endMs": 2500, "positionY": 0.85, "fontSize": 72, "colorHex": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 3, "animationType": "pop"},
-    {"text": "Continue here", "startMs": 2500, "endMs": 5000, "positionY": 0.85, "fontSize": 64, "colorHex": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 3, "animationType": "fade"}
+    {"text": "HOOK LINE HERE", "startMs": 0, "endMs": 2500, "positionY": 0.85, "fontSize": 72, "colorHex": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 3},
+    {"text": "Second line", "startMs": 2500, "endMs": 5500, "positionY": 0.85, "fontSize": 64, "colorHex": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 3},
+    {"text": "Third line", "startMs": 5500, "endMs": 9000, "positionY": 0.85, "fontSize": 64, "colorHex": "#FFFFFF", "strokeColor": "#000000", "strokeWidth": 3}
   ],
   "hashtags": ["#viral", "#fyp", "#trending"]
 }`;
@@ -302,9 +310,13 @@ Return ONLY valid JSON (no markdown fences, no explanation):
           const jsonStr = raw.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
           const plan = JSON.parse(jsonStr) as {
             title?: string; description?: string; viralScore?: number; hookScore?: number;
-            startMs?: number; endMs?: number; cuts?: unknown[]; zooms?: unknown[];
-            captions?: unknown[]; hashtags?: string[];
+            keepSegments?: Array<{ startMs: number; endMs: number }>;
+            zooms?: unknown[]; captions?: unknown[]; hashtags?: string[];
           };
+
+          const segs = plan.keepSegments ?? [{ startMs: startGuess, endMs: startGuess + targetMs }];
+          const clipStartMs = segs[0]?.startMs ?? startGuess;
+          const clipEndMs = segs[segs.length - 1]?.endMs ?? startGuess + targetMs;
 
           const clip: Clip = {
             id: `clip-${Date.now()}`,
@@ -312,9 +324,9 @@ Return ONLY valid JSON (no markdown fences, no explanation):
             description: plan.description ?? null,
             hashtags: plan.hashtags ?? [],
             platform: options.platform,
-            startMs: plan.startMs ?? 0,
-            endMs: plan.endMs ?? targetMs,
-            durationMs: (plan.endMs ?? targetMs) - (plan.startMs ?? 0),
+            startMs: clipStartMs,
+            endMs: clipEndMs,
+            durationMs: targetMs,
             viralScore: plan.viralScore ?? null,
             hookScore: plan.hookScore ?? null,
             retentionScore: null,
@@ -322,7 +334,7 @@ Return ONLY valid JSON (no markdown fences, no explanation):
           };
 
           const editPlan: EditPlan = {
-            cutsJson: plan.cuts ?? [],
+            cutsJson: segs,
             zoomsJson: plan.zooms ?? [],
             captionsJson: plan.captions ?? [],
             transitionsJson: [],
@@ -357,7 +369,7 @@ Return ONLY valid JSON (no markdown fences, no explanation):
 
         return {
           editPlan: {
-            cuts: (project.editPlan.cutsJson as unknown[]) ?? [],
+            keepSegments: (project.editPlan.cutsJson as unknown[]) ?? [],
             zooms: (project.editPlan.zoomsJson as unknown[]) ?? [],
             captions: (project.editPlan.captionsJson as unknown[]) ?? [],
             transitions: (project.editPlan.transitionsJson as unknown[]) ?? [],
