@@ -10,6 +10,7 @@ export interface Project {
   createdAt: string;
   videos: Array<{
     id: string;
+    name: string;
     status: string;
     durationSeconds: number | null;
     storageUrl?: string;
@@ -77,6 +78,7 @@ export interface AppState {
   loadProjects: () => Promise<void>;
   loadProject: (projectId: string) => Promise<Project>;
   uploadVideo: (file: File, projectName: string, platform: string) => Promise<string>;
+  uploadVideos: (files: File[], projectName: string, platform: string) => Promise<string>;
   triggerAnalysis: (projectId: string, options: AnalysisOptions) => Promise<void>;
   applyEditPlan: (projectId: string, clipIndex?: number) => Promise<ApplyEditResult>;
   updateProcessingStatus: (projectId: string, status: string, progress: number, message: string) => void;
@@ -114,6 +116,7 @@ export interface ApplyEditResult {
     storageUrl?: string;
     durationSeconds: number | null;
   };
+  videos: Array<{ name: string; storagePath: string; durationSeconds: number | null }>;
   titleSuggestion: string | null;
   descriptionSuggestion: string | null;
   hashtags: unknown;
@@ -199,17 +202,27 @@ export const useStore = create<AppState>()(
       },
 
       uploadVideo: async (file, projectName, platform) => {
-        const projectId = `local-${Date.now()}`;
-        const filePath = (file as File & { path?: string }).path;
+        return get().uploadVideos([file], projectName, platform);
+      },
 
-        try {
-          if (filePath) {
-            const { TimelineManager } = await import('../../premiere/timeline.js');
-            await new TimelineManager().importVideoToProject(filePath);
-          }
-        } catch {
-          // Premiere import failure is non-fatal — project still gets created locally
-        }
+      uploadVideos: async (files, projectName, platform) => {
+        const projectId = `local-${Date.now()}`;
+        const tm = new (await import('../../premiere/timeline.js')).TimelineManager();
+
+        const videos = await Promise.all(files.map(async (file, i) => {
+          const filePath = (file as File & { path?: string }).path;
+          const clipName = file.name.replace(/\.[^.]+$/, '');
+          try {
+            if (filePath) await tm.importVideoToProject(filePath);
+          } catch { /* non-fatal */ }
+          return {
+            id: `video-${Date.now()}-${i}`,
+            name: clipName,
+            status: 'READY' as const,
+            durationSeconds: null,
+            storageUrl: filePath ?? undefined,
+          };
+        }));
 
         const project: Project = {
           id: projectId,
@@ -217,12 +230,7 @@ export const useStore = create<AppState>()(
           status: 'DRAFT',
           platform,
           createdAt: new Date().toISOString(),
-          videos: [{
-            id: `video-${Date.now()}`,
-            status: 'READY',
-            durationSeconds: null,
-            storageUrl: filePath ?? undefined,
-          }],
+          videos,
           clips: [],
           editPlan: null,
         };
@@ -241,40 +249,59 @@ export const useStore = create<AppState>()(
 
         get().updateProcessingStatus(projectId, 'analyzing', 10, 'Connecting to Claude AI...');
 
-        const durationMs = (currentProject?.videos[0]?.durationSeconds ?? 60) * 1000;
-        const targetMs = parseInt(options.targetDuration) * 1000;
-        const startGuess = Math.round(durationMs * 0.1);
+        const videoList = currentProject?.videos ?? [];
+        const targetMs  = parseInt(options.targetDuration) * 1000;
+        const isMulti   = videoList.length > 1;
 
-        const prompt = `You are a professional viral video editor. Generate a complete edit plan for a short-form video.
+        const videoDescriptions = videoList.map((v, i) =>
+          `  Video ${i} (clipIndex ${i}): "${v.name}" — ${Math.round((v.durationSeconds ?? 60))}s`,
+        ).join('\n');
 
-Video info:
-- Name: "${currentProject?.name ?? 'Unknown'}"
-- Total duration: ${Math.round(durationMs / 1000)}s
-- Target platform: ${options.platform.replace(/_/g, ' ')}
-- Target final duration: ${options.targetDuration}s
-- Caption style: ${options.captionStyle}
-- Remove filler words: ${options.removeFillers}
-- Remove silences: ${options.removeSilence}
+        const firstDurMs  = (videoList[0]?.durationSeconds ?? 60) * 1000;
+        const startGuess  = Math.round(firstDurMs * 0.1);
+
+        const exampleSegs = isMulti
+          ? videoList.map((v, i) => {
+              const dur = (v.durationSeconds ?? 60) * 1000;
+              const s   = Math.round(dur * 0.1);
+              const share = Math.round(targetMs / videoList.length);
+              return `    {"clipIndex": ${i}, "startMs": ${s}, "endMs": ${Math.min(s + share, dur)}}`;
+            }).join(',\n')
+          : [
+              `    {"clipIndex": 0, "startMs": ${startGuess}, "endMs": ${startGuess + Math.round(targetMs * 0.18)}}`,
+              `    {"clipIndex": 0, "startMs": ${startGuess + Math.round(targetMs * 0.19)}, "endMs": ${startGuess + Math.round(targetMs * 0.37)}}`,
+              `    {"clipIndex": 0, "startMs": ${startGuess + Math.round(targetMs * 0.38)}, "endMs": ${startGuess + Math.round(targetMs * 0.57)}}`,
+              `    {"clipIndex": 0, "startMs": ${startGuess + Math.round(targetMs * 0.58)}, "endMs": ${startGuess + Math.round(targetMs * 0.76)}}`,
+              `    {"clipIndex": 0, "startMs": ${startGuess + Math.round(targetMs * 0.77)}, "endMs": ${startGuess + targetMs}}`,
+            ].join(',\n');
+
+        const prompt = `You are a professional viral video editor. Generate a complete edit plan for a short-form video${isMulti ? ' MERGED from multiple source videos' : ''}.
+
+Source video${isMulti ? 's' : ''}:
+${videoDescriptions}
+
+Target platform: ${options.platform.replace(/_/g, ' ')}
+Target final duration: ${options.targetDuration}s
+Caption style: ${options.captionStyle}
+Remove filler words: ${options.removeFillers}
+Remove silences: ${options.removeSilence}
 
 Instructions:
-1. Pick the best ${options.targetDuration}s starting around ${Math.round(durationMs / 1000 * 0.1)}s into the video
-2. Simulate silence/pause removal: split into 5-8 short keep segments with 0.3-1s gaps removed between them
-3. Total of all keepSegments durations must equal exactly ${options.targetDuration}s
-4. Captions: one short punchy line every 2-4 seconds (times are RELATIVE to the final edited clip, starting at 0)
-5. Zooms: 1-2 subtle zoom-ins for emphasis (times also relative to clip start)
+1. ${isMulti ? `Merge ALL ${videoList.length} videos into one ${options.targetDuration}s clip — take the best moments from each` : `Pick the best ${options.targetDuration}s starting around ${Math.round(firstDurMs / 1000 * 0.1)}s`}
+2. Split into 5-8 keep segments with 0.3-1s gaps (simulating silence/pause removal)
+3. Every segment MUST include "clipIndex" (0-based index of the source video)
+4. Total of all keepSegments durations must equal exactly ${options.targetDuration}s
+5. Captions: one short punchy line every 2-4 seconds (RELATIVE to final clip start at 0)
+6. Zooms: 1-2 subtle zoom-ins for emphasis (also relative)
 
-Return ONLY valid JSON (no markdown, no explanation):
+Return ONLY valid JSON (no markdown):
 {
   "title": "VIRAL TITLE IN CAPS",
   "description": "one hook sentence",
   "viralScore": 85,
   "hookScore": 78,
   "keepSegments": [
-    {"startMs": ${startGuess}, "endMs": ${startGuess + Math.round(targetMs * 0.18)}},
-    {"startMs": ${startGuess + Math.round(targetMs * 0.19)}, "endMs": ${startGuess + Math.round(targetMs * 0.37)}},
-    {"startMs": ${startGuess + Math.round(targetMs * 0.38)}, "endMs": ${startGuess + Math.round(targetMs * 0.57)}},
-    {"startMs": ${startGuess + Math.round(targetMs * 0.58)}, "endMs": ${startGuess + Math.round(targetMs * 0.76)}},
-    {"startMs": ${startGuess + Math.round(targetMs * 0.77)}, "endMs": ${startGuess + targetMs}}
+${exampleSegs}
   ],
   "zooms": [
     {"startMs": ${Math.round(targetMs * 0.05)}, "endMs": ${Math.round(targetMs * 0.20)}, "scale": 1.15, "posX": 0.5, "posY": 0.5, "easing": "ease-in-out"},
@@ -396,6 +423,11 @@ Return ONLY valid JSON (no markdown, no explanation):
             storageUrl: video?.storageUrl,
             durationSeconds: video?.durationSeconds,
           },
+          videos: (project.videos ?? []).map((v) => ({
+            name: v.name,
+            storagePath: v.storageUrl ?? '',
+            durationSeconds: v.durationSeconds,
+          })),
           titleSuggestion: project.editPlan.titleSuggestion,
           descriptionSuggestion: project.editPlan.descriptionSuggestion,
           hashtags: project.editPlan.hashtagsJson,

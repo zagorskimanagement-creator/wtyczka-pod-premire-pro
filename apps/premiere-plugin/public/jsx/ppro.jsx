@@ -73,6 +73,47 @@ function clearAllTracks(seq) {
   }
 }
 
+// ─── Setup sequence from multiple source clips (merge) ───────────────────────
+
+function setupSequenceWithMultipleClips(clipNamesJson, segmentsJson) {
+  try {
+    var clipNames = JSON.parse(clipNamesJson);
+    var segments  = JSON.parse(segmentsJson);
+    if (!segments || segments.length === 0) return JSON.stringify({ error: 'No segments' });
+
+    var clips = [];
+    for (var c = 0; c < clipNames.length; c++) {
+      var found = findProjectClip(clipNames[c]);
+      if (!found) return JSON.stringify({ error: 'Clip not found: ' + clipNames[c] });
+      clips.push(found);
+    }
+
+    var seqName = clipNames[0].substring(0, 30) + ' - ShortForge Merge';
+    app.project.createNewSequenceFromClips(seqName, [clips[0]], app.project.rootItem);
+    var seq = app.project.activeSequence;
+    if (!seq) return JSON.stringify({ error: 'Could not create sequence' });
+
+    clearAllTracks(seq);
+
+    var timelineSec = 0;
+    for (var k = 0; k < segments.length; k++) {
+      var seg    = segments[k];
+      var idx    = (typeof seg.clipIndex === 'number' ? seg.clipIndex : 0);
+      if (idx >= clips.length) idx = 0;
+      var src    = clips[idx];
+      var inSec  = seg.startMs / 1000;
+      var outSec = seg.endMs   / 1000;
+      if (outSec <= inSec) continue;
+      seq.videoTracks[0].insertClip(src, timelineSec, inSec, outSec);
+      timelineSec += (outSec - inSec);
+    }
+
+    return JSON.stringify({ success: true, name: seq.name, totalMs: Math.round(timelineSec * 1000) });
+  } catch (e) {
+    return JSON.stringify({ error: e.toString() });
+  }
+}
+
 // ─── Setup sequence with multiple keep segments ───────────────────────────────
 
 function setupSequenceWithSegments(clipName, segmentsJson) {

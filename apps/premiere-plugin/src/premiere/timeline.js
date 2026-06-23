@@ -33,6 +33,12 @@ export class TimelineManager {
         if (data.error)
             throw new Error(`Could not set up sequence: ${data.error}`);
     }
+    async setupSequenceWithMultipleClips(clipNames, segments) {
+        const result = await evalScript(`setupSequenceWithMultipleClips(${JSON.stringify(JSON.stringify(clipNames))}, ${JSON.stringify(JSON.stringify(segments))})`);
+        const data = JSON.parse(result);
+        if (data.error)
+            throw new Error(`Could not set up multi-clip sequence: ${data.error}`);
+    }
     async reframeSequence(format) {
         await evalScript(`reframeSequence(${JSON.stringify(format)})`);
     }

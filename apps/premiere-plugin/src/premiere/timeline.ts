@@ -6,6 +6,7 @@ declare const CSInterface: new () => {
 export interface KeepSegment {
   startMs: number;
   endMs: number;
+  clipIndex?: number;
 }
 
 export interface ZoomInstruction {
@@ -86,6 +87,14 @@ export class TimelineManager {
     );
     const data = JSON.parse(result) as { error?: string };
     if (data.error) throw new Error(`Could not set up sequence: ${data.error}`);
+  }
+
+  async setupSequenceWithMultipleClips(clipNames: string[], segments: KeepSegment[]): Promise<void> {
+    const result = await evalScript(
+      `setupSequenceWithMultipleClips(${JSON.stringify(JSON.stringify(clipNames))}, ${JSON.stringify(JSON.stringify(segments))})`,
+    );
+    const data = JSON.parse(result) as { error?: string };
+    if (data.error) throw new Error(`Could not set up multi-clip sequence: ${data.error}`);
   }
 
   async reframeSequence(format: '9:16' | '16:9' | '1:1'): Promise<void> {

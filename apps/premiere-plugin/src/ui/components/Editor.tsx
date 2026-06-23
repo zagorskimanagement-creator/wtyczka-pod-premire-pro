@@ -69,13 +69,18 @@ export function Editor({ onNavigate }: EditorProps) {
       const result = await applyEditPlan(activeProjectId, selectedClipIndex);
 
       const tm = new TimelineManager();
-      const keepSegments = result.editPlan.keepSegments as Array<{ startMs: number; endMs: number }>;
+      const keepSegments = result.editPlan.keepSegments as Array<{ startMs: number; endMs: number; clipIndex?: number }>;
+      const videoNames = result.videos.map((v) => v.name);
 
-      // Build sequence with multiple keep segments (actual cuts on timeline)
-      await tm.setupSequenceWithSegments(
-        currentProject?.name ?? 'ShortForge Clip',
-        keepSegments,
-      );
+      // Multi-video merge or single-video cut sequence
+      if (result.videos.length > 1) {
+        await tm.setupSequenceWithMultipleClips(videoNames, keepSegments);
+      } else {
+        await tm.setupSequenceWithSegments(
+          videoNames[0] ?? currentProject?.name ?? 'ShortForge Clip',
+          keepSegments,
+        );
+      }
 
       // Captions and zooms are already relative to the final edited clip (start at 0)
       await tm.applyEditPlan({
