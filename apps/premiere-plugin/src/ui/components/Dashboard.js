@@ -12,25 +12,19 @@ export function Dashboard({ onNavigate }) {
         void loadProjects().catch(() => { });
     }, [loadProjects]);
     const handleFileUpload = async (file) => {
-        const validTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
-        if (!validTypes.includes(file.type)) {
-            setUploadError('Invalid file type. Please upload MP4, MOV, AVI, or WebM.');
+        const validExts = ['.mp4', '.mov', '.avi', '.webm', '.mkv'];
+        const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+        if (!validExts.includes(ext)) {
+            setUploadError('Invalid file type. Please upload MP4, MOV, AVI, MKV, or WebM.');
             return;
         }
         setIsUploading(true);
         setUploadError('');
-        try {
-            const projectName = file.name.replace(/\.[^.]+$/, '');
-            const projectId = await uploadVideo(file, projectName, 'TIKTOK');
-            setActiveProject(projectId);
-            onNavigate('editor');
-        }
-        catch (err) {
-            setUploadError('Upload failed. Please try again.');
-        }
-        finally {
-            setIsUploading(false);
-        }
+        const projectName = file.name.replace(/\.[^.]+$/, '');
+        const projectId = await uploadVideo(file, projectName, 'TIKTOK');
+        setActiveProject(projectId);
+        setIsUploading(false);
+        onNavigate('editor');
     };
     const handleDrop = (e) => {
         e.preventDefault();

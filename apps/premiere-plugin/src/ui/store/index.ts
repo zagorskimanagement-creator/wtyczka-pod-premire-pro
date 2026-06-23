@@ -184,9 +184,13 @@ export const useStore = create<AppState>()(
         const projectId = `local-${Date.now()}`;
         const filePath = (file as File & { path?: string }).path;
 
-        if (filePath) {
-          const { TimelineManager } = await import('../../premiere/timeline.js');
-          await new TimelineManager().importVideoToProject(filePath);
+        try {
+          if (filePath) {
+            const { TimelineManager } = await import('../../premiere/timeline.js');
+            await new TimelineManager().importVideoToProject(filePath);
+          }
+        } catch {
+          // Premiere import failure is non-fatal — project still gets created locally
         }
 
         const project: Project = {
@@ -199,7 +203,7 @@ export const useStore = create<AppState>()(
             id: `video-${Date.now()}`,
             status: 'READY',
             durationSeconds: null,
-            storageUrl: filePath,
+            storageUrl: filePath ?? undefined,
           }],
           clips: [],
           editPlan: null,
